@@ -65,6 +65,7 @@ export function paymentMiddleware(options: PaymentMiddlewareOptions): RequestHan
       chainId: options.chainId,
     },
     publicClient: clientFor(options),
+    ...(options.usdcAddress === undefined ? {} : { usdcAddress: options.usdcAddress }),
     ...(options.confirmations === undefined ? {} : { confirmations: options.confirmations }),
     ...(options.replayStore === undefined ? {} : { replayStore: options.replayStore }),
   });

@@ -12,9 +12,11 @@ import { describe, expect, test } from "vitest";
 import { PAYMENT_HEADER, paymentMiddleware, type ReceiptClient } from "../src/index.js";
 
 const hash = `0x${"a".repeat(64)}` as Hash;
+const customTokenHash = `0x${"b".repeat(64)}` as Hash;
 const payTo = "0x1111111111111111111111111111111111111111" as Address;
 const from = "0x2222222222222222222222222222222222222222" as Address;
 const usdc = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address;
+const customUsdc = "0x5555555555555555555555555555555555555555" as Address;
 const transferAbi = parseAbi([
   "event Transfer(address indexed from, address indexed to, uint256 value)",
 ]);
@@ -22,9 +24,11 @@ const transferAbi = parseAbi([
 function clientFor({
   paid = 10_000n,
   receiptError,
+  token = usdc,
 }: {
   paid?: bigint;
   receiptError?: Error;
+  token?: Address;
 } = {}): ReceiptClient {
   return {
     async getTransactionReceipt() {
@@ -33,7 +37,7 @@ function clientFor({
         status: "success",
         blockNumber: 100n,
         logs: [{
-          address: usdc,
+          address: token,
           topics: encodeEventTopics({
             abi: transferAbi,
             eventName: "Transfer",
@@ -49,7 +53,7 @@ function clientFor({
   };
 }
 
-function appFor(client: ReceiptClient) {
+function appFor(client: ReceiptClient, usdcAddress?: Address) {
   const app = express();
   app.get(
     "/api/data",
@@ -58,6 +62,7 @@ function appFor(client: ReceiptClient) {
       payTo,
       chainId: 84532,
       publicClient: client,
+      ...(usdcAddress === undefined ? {} : { usdcAddress }),
     }),
     (_request, response) => response.json({ data: "paid" }),
   );
@@ -79,6 +84,14 @@ describe("paymentMiddleware", () => {
     await request(appFor(clientFor()))
       .get("/api/data")
       .set(PAYMENT_HEADER, hash)
+      .expect(200)
+      .expect({ data: "paid" });
+  });
+
+  test("uses an injected USDC address when verifying a receipt", async () => {
+    await request(appFor(clientFor({ token: customUsdc }), customUsdc))
+      .get("/api/data")
+      .set(PAYMENT_HEADER, customTokenHash)
       .expect(200)
       .expect({ data: "paid" });
   });

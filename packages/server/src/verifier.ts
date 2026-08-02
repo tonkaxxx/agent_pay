@@ -72,6 +72,7 @@ export type PaymentVerifier = (txHash: string) => Promise<PaymentVerificationRes
 export interface CreatePaymentVerifierOptions {
   requirements: PaymentRequirements;
   publicClient: ReceiptClient;
+  usdcAddress?: Address;
   confirmations?: number;
   replayStore?: ReplayStore;
 }
@@ -83,6 +84,7 @@ export function getUsdcAddress(chainId: SupportedChainId): Address {
 export function createPaymentVerifier({
   requirements,
   publicClient,
+  usdcAddress: configuredUsdcAddress,
   confirmations = 1,
   replayStore = defaultReplayStore,
 }: CreatePaymentVerifierOptions): PaymentVerifier {
@@ -96,7 +98,9 @@ export function createPaymentVerifier({
   }
 
   const payTo = getAddress(requirements.payTo);
-  const usdcAddress = getUsdcAddress(requirements.chainId);
+  const usdcAddress = configuredUsdcAddress === undefined
+    ? getUsdcAddress(requirements.chainId)
+    : getAddress(configuredUsdcAddress);
 
   return async (txHash) => {
     if (!isHash(txHash)) {

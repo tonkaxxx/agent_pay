@@ -20,6 +20,7 @@ const hash = `0x${"a".repeat(64)}` as Hash;
 const payTo = "0x1111111111111111111111111111111111111111" as Address;
 const from = "0x2222222222222222222222222222222222222222" as Address;
 const usdc = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address;
+const customUsdc = "0x5555555555555555555555555555555555555555" as Address;
 type TestReceipt = Awaited<ReturnType<ReceiptClient["getTransactionReceipt"]>>;
 const otherToken = "0x3333333333333333333333333333333333333333" as Address;
 const otherRecipient = "0x4444444444444444444444444444444444444444" as Address;
@@ -63,11 +64,16 @@ function makeClient(
   };
 }
 
-function verifierFor(client: ReceiptClient, confirmations = 1): PaymentVerifier {
+function verifierFor(
+  client: ReceiptClient,
+  confirmations = 1,
+  usdcAddress?: Address,
+): PaymentVerifier {
   return createPaymentVerifier({
     requirements: { priceUsdc: "0.01", payTo, chainId: 84532 },
     publicClient: client,
     confirmations,
+    ...(usdcAddress === undefined ? {} : { usdcAddress }),
     replayStore: new InMemoryReplayStore(),
   });
 }
@@ -103,6 +109,19 @@ describe("createPaymentVerifier", () => {
       valid: false,
       reason: "insufficient_payment",
     });
+  });
+
+  test("uses the injected USDC address instead of the default token address", async () => {
+    const verify = verifierFor(
+      makeClient(makeReceipt({ token: customUsdc })),
+      1,
+      customUsdc,
+    );
+
+    await expect(verify(hash)).resolves.toEqual({ valid: true });
+    await expect(
+      verifierFor(makeClient(makeReceipt()), 1, customUsdc)(hash),
+    ).resolves.toMatchObject({ valid: false, reason: "insufficient_payment" });
   });
 
   test("rejects transfers to another recipient", async () => {
