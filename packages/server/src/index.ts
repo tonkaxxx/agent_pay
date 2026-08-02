@@ -13,3 +13,8 @@ export type {
   ReplayStore,
   SupportedChainId,
 } from "./verifier.js";
+export { PAYMENT_HEADER, paymentMiddleware } from "./middleware.js";
+export type {
+  PaymentMiddlewareOptions,
+  PaymentRequiredPayload,
+} from "./middleware.js";
