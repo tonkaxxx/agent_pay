@@ -6,8 +6,8 @@
   "packageManager": "pnpm@11.18.0",
   "engines": { "node": ">=20" },
   "scripts": {
-    "build": "pnpm --recursive --filter './packages/*' run build",
-    "typecheck": "pnpm --recursive --filter './packages/*' run typecheck && tsc -p tsconfig.json",
+    "build": "corepack pnpm --recursive --filter './packages/*' run build",
+    "typecheck": "corepack pnpm --recursive --filter './packages/*' run typecheck && tsc -p tsconfig.json",
     "test": "vitest run",
     "demo:vendor": "tsx examples/vendor-api.ts",
     "demo:agent": "tsx examples/ai-agent.ts"
