@@ -14,6 +14,7 @@ import {
   InMemoryReplayStore,
   type PaymentVerifier,
   type ReceiptClient,
+  type ReplayStore,
 } from "../src/index.js";
 
 const hash = `0x${"a".repeat(64)}` as Hash;
@@ -86,6 +87,31 @@ describe("createPaymentVerifier", () => {
   test("accepts a successful USDC Transfer that covers the required price", async () => {
     await expect(verifierFor(makeClient(makeReceipt()))(hash)).resolves.toEqual({ valid: true });
   });
+
+  test("accepts an overpayment above the required price", async () => {
+    await expect(
+      verifierFor(makeClient(makeReceipt({ values: [10_001n] })))(hash),
+    ).resolves.toEqual({ valid: true });
+  });
+
+  test("rejects an unsupported chain at verifier creation", () => {
+    expect(() => createPaymentVerifier({
+      requirements: { priceUsdc: "0.01", payTo, chainId: 1 as 84532 },
+      publicClient: makeClient(makeReceipt()),
+      usdcAddress: customUsdc,
+    })).toThrow(/chainId/);
+  });
+
+  test.each([0, 1.5])(
+    "rejects invalid confirmations %s at verifier creation",
+    (confirmations) => {
+      expect(() => createPaymentVerifier({
+        requirements: { priceUsdc: "0.01", payTo, chainId: 84532 },
+        publicClient: makeClient(makeReceipt()),
+        confirmations,
+      })).toThrow(/confirmations/);
+    },
+  );
 
   test("rejects malformed transaction hashes", async () => {
     const verify = verifierFor(makeClient(makeReceipt()));
@@ -177,6 +203,26 @@ describe("createPaymentVerifier", () => {
       retryable: true,
     });
   });
+
+  test.each([
+    ["throws", { claim: () => { throw new Error("store unavailable"); } }],
+    ["rejects", { claim: vi.fn().mockRejectedValue(new Error("store unavailable")) }],
+  ] satisfies [string, ReplayStore][])(
+    "maps a replay-store claim that %s to a retryable failure",
+    async (_behavior, replayStore) => {
+      const verify = createPaymentVerifier({
+        requirements: { priceUsdc: "0.01", payTo, chainId: 84532 },
+        publicClient: makeClient(makeReceipt()),
+        replayStore,
+      });
+
+      await expect(verify(hash)).resolves.toEqual({
+        valid: false,
+        reason: "verification_unavailable",
+        retryable: true,
+      });
+    },
+  );
 
   test("rejects a previously accepted transaction hash", async () => {
     const verify = verifierFor(makeClient(makeReceipt()));

@@ -77,17 +77,24 @@ export interface CreatePaymentVerifierOptions {
   replayStore?: ReplayStore;
 }
 
+export function assertSupportedChainId(
+  chainId: unknown,
+): asserts chainId is SupportedChainId {
+  if (chainId !== 8453 && chainId !== 84532) {
+    throw new Error("chainId must be 8453 or 84532");
+  }
+}
+
 export function getUsdcAddress(chainId: SupportedChainId): Address {
+  assertSupportedChainId(chainId);
   return usdcAddresses[chainId];
 }
 
-export function createPaymentVerifier({
-  requirements,
-  publicClient,
-  usdcAddress: configuredUsdcAddress,
-  confirmations = 1,
-  replayStore = defaultReplayStore,
-}: CreatePaymentVerifierOptions): PaymentVerifier {
+export function validatePaymentRequirements(requirements: PaymentRequirements): {
+  payTo: Address;
+  requiredAmount: bigint;
+} {
+  assertSupportedChainId(requirements.chainId);
   if (!usdcPricePattern.test(requirements.priceUsdc)) {
     throw new Error("priceUsdc must be a USDC amount with at most six decimal places");
   }
@@ -97,7 +104,24 @@ export function createPaymentVerifier({
     throw new Error("priceUsdc must be greater than zero");
   }
 
-  const payTo = getAddress(requirements.payTo);
+  return {
+    payTo: getAddress(requirements.payTo),
+    requiredAmount,
+  };
+}
+
+export function createPaymentVerifier({
+  requirements,
+  publicClient,
+  usdcAddress: configuredUsdcAddress,
+  confirmations = 1,
+  replayStore = defaultReplayStore,
+}: CreatePaymentVerifierOptions): PaymentVerifier {
+  if (!Number.isInteger(confirmations) || confirmations <= 0) {
+    throw new Error("confirmations must be a positive integer");
+  }
+
+  const { payTo, requiredAmount } = validatePaymentRequirements(requirements);
   const usdcAddress = configuredUsdcAddress === undefined
     ? getUsdcAddress(requirements.chainId)
     : getAddress(configuredUsdcAddress);
@@ -150,7 +174,14 @@ export function createPaymentVerifier({
       return { valid: false, reason: "insufficient_payment", retryable: false };
     }
 
-    if (!(await replayStore.claim(`${requirements.chainId}:${txHash.toLowerCase()}`))) {
+    let claimed: boolean;
+    try {
+      claimed = await replayStore.claim(`${requirements.chainId}:${txHash.toLowerCase()}`);
+    } catch {
+      return { valid: false, reason: "verification_unavailable", retryable: true };
+    }
+
+    if (!claimed) {
       return { valid: false, reason: "transaction_replayed", retryable: false };
     }
 
