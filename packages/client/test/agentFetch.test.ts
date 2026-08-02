@@ -1,13 +1,18 @@
-import type { Hex } from "viem";
+import type { Hash, Hex } from "viem";
 import { describe, expect, test, vi } from "vitest";
 
 import {
   createAgentFetch,
+  type PaymentRuntime,
+  USDC_BASE_SEPOLIA,
+  X402PaymentError,
   X402ProtocolError,
 } from "../src/index.js";
 
 const privateKey = `0x${"11".repeat(32)}` as Hex;
 const rpcUrl = "https://rpc.example";
+const payTo = "0x1111111111111111111111111111111111111111";
+const hash = `0x${"ab".repeat(32)}` as Hash;
 
 function paymentRequired(payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
@@ -29,6 +34,15 @@ function validPaymentRequirement(overrides: Record<string, unknown> = {}) {
     payTo: "0x1111111111111111111111111111111111111111",
     network: "base-sepolia",
     chainId: 84532,
+    ...overrides,
+  };
+}
+
+function paymentRuntime(overrides: Partial<PaymentRuntime> = {}): PaymentRuntime {
+  return {
+    getChainId: vi.fn().mockResolvedValue(84532),
+    transferUsdc: vi.fn().mockResolvedValue(hash),
+    waitForReceipt: vi.fn().mockResolvedValue({ status: "success" }),
     ...overrides,
   };
 }
@@ -67,5 +81,97 @@ describe("createAgentFetch", () => {
     });
     expect(createPaymentRuntime).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("pays the validated USDC requirement then retries the original request with its transaction hash", async () => {
+    const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
+    const runtime = paymentRuntime();
+    createPaymentRuntime.mockReturnValue(runtime);
+    fetch
+      .mockResolvedValueOnce(paymentRequired(validPaymentRequirement()))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: "paid" }), { status: 200 }));
+    const agentFetch = createAgentFetch({ privateKey, rpcUrl }, dependencies);
+
+    const response = await agentFetch("https://vendor.example/data", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-agent": "demo" },
+      body: JSON.stringify({ prompt: "hello" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(runtime.transferUsdc).toHaveBeenCalledWith({
+      token: USDC_BASE_SEPOLIA,
+      to: payTo,
+      amount: 10_000n,
+    });
+    expect(runtime.waitForReceipt).toHaveBeenCalledWith(hash, 1);
+    expect(fetch).toHaveBeenCalledTimes(2);
+
+    const retryRequest = fetch.mock.calls[1]?.[0] as Request;
+    expect(retryRequest.method).toBe("POST");
+    expect(retryRequest.headers.get("content-type")).toBe("application/json");
+    expect(retryRequest.headers.get("x-agent")).toBe("demo");
+    expect(retryRequest.headers.get("X-Payment-Tx")).toBe(hash);
+    await expect(retryRequest.text()).resolves.toBe(JSON.stringify({ prompt: "hello" }));
+  });
+
+  test("rejects a payment when the RPC chain does not match the validated requirement", async () => {
+    const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
+    const runtime = paymentRuntime({ getChainId: vi.fn().mockResolvedValue(8453) });
+    createPaymentRuntime.mockReturnValue(runtime);
+    fetch.mockResolvedValueOnce(paymentRequired(validPaymentRequirement()));
+    const agentFetch = createAgentFetch({ privateKey, rpcUrl }, dependencies);
+
+    await expect(agentFetch("https://vendor.example/data")).rejects.toMatchObject<Partial<X402PaymentError>>({
+      name: "X402PaymentError",
+      code: "rpc_chain_mismatch",
+    });
+    expect(runtime.transferUsdc).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("wraps a failed USDC transfer in a typed payment error", async () => {
+    const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
+    const cause = new Error("wallet rejected transfer");
+    const runtime = paymentRuntime({ transferUsdc: vi.fn().mockRejectedValue(cause) });
+    createPaymentRuntime.mockReturnValue(runtime);
+    fetch.mockResolvedValueOnce(paymentRequired(validPaymentRequirement()));
+    const agentFetch = createAgentFetch({ privateKey, rpcUrl }, dependencies);
+
+    await expect(agentFetch("https://vendor.example/data")).rejects.toMatchObject<Partial<X402PaymentError>>({
+      name: "X402PaymentError",
+      code: "transfer_failed",
+      cause,
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("rejects a reverted payment receipt without retrying the request", async () => {
+    const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
+    const runtime = paymentRuntime({ waitForReceipt: vi.fn().mockResolvedValue({ status: "reverted" }) });
+    createPaymentRuntime.mockReturnValue(runtime);
+    fetch.mockResolvedValueOnce(paymentRequired(validPaymentRequirement()));
+    const agentFetch = createAgentFetch({ privateKey, rpcUrl }, dependencies);
+
+    await expect(agentFetch("https://vendor.example/data")).rejects.toMatchObject<Partial<X402PaymentError>>({
+      name: "X402PaymentError",
+      code: "transaction_failed",
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("returns a second HTTP 402 response without submitting a second transfer", async () => {
+    const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
+    const runtime = paymentRuntime();
+    createPaymentRuntime.mockReturnValue(runtime);
+    const retryPaymentRequired = paymentRequired(validPaymentRequirement());
+    fetch
+      .mockResolvedValueOnce(paymentRequired(validPaymentRequirement()))
+      .mockResolvedValueOnce(retryPaymentRequired);
+    const agentFetch = createAgentFetch({ privateKey, rpcUrl }, dependencies);
+
+    await expect(agentFetch("https://vendor.example/data")).resolves.toBe(retryPaymentRequired);
+    expect(runtime.transferUsdc).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });

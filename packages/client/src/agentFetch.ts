@@ -1,11 +1,16 @@
 import {
+  createPublicClient,
+  createWalletClient,
   getAddress,
+  http,
+  parseAbi,
   parseUnits,
   type Address,
   type Hash,
   type Hex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { base, baseSepolia } from "viem/chains";
 
 export type ProtocolErrorCode =
   | "invalid_payment_response"
@@ -70,19 +75,45 @@ export interface AgentFetchDependencies {
 type SupportedChainId = 8453 | 84532;
 type BaseNetwork = "base" | "base-sepolia";
 
+export const USDC_BASE: Address = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+export const USDC_BASE_SEPOLIA: Address = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+
 const baseNetworks: Readonly<Record<SupportedChainId, BaseNetwork>> = {
   8453: "base",
   84532: "base-sepolia",
 };
+const usdcAddresses: Readonly<Record<SupportedChainId, Address>> = {
+  8453: USDC_BASE,
+  84532: USDC_BASE_SEPOLIA,
+};
+const transferAbi = parseAbi([
+  "function transfer(address to, uint256 value) returns (bool)",
+]);
 const usdcPricePattern = /^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/;
+const PAYMENT_HEADER = "X-Payment-Tx";
 
 const defaultDependencies: AgentFetchDependencies = {
   fetch: (...args) => globalThis.fetch(...args),
-  createPaymentRuntime: () => {
-    throw new X402PaymentError(
-      "transfer_failed",
-      "Payment runtime is not available until payment execution is configured.",
-    );
+  createPaymentRuntime: ({ privateKey, rpcUrl, chainId }) => {
+    const chain = chainId === 8453 ? base : baseSepolia;
+    const account = privateKeyToAccount(privateKey);
+    const transport = http(rpcUrl);
+    const publicClient = createPublicClient({ chain, transport });
+    const walletClient = createWalletClient({ account, chain, transport });
+
+    return {
+      getChainId: () => publicClient.getChainId(),
+      transferUsdc: ({ token, to, amount }) => walletClient.writeContract({
+        address: token,
+        abi: transferAbi,
+        functionName: "transfer",
+        args: [to, amount],
+      }),
+      waitForReceipt: async (hash, confirmations) => {
+        const receipt = await publicClient.waitForTransactionReceipt({ hash, confirmations });
+        return { status: receipt.status };
+      },
+    };
   },
 };
 
@@ -129,7 +160,13 @@ function protocolError(
   return new X402ProtocolError(code, message, options);
 }
 
-function validatePaymentRequirement(value: unknown, cap: bigint): void {
+interface PaymentRequirement {
+  chainId: SupportedChainId;
+  payTo: Address;
+  amount: bigint;
+}
+
+function validatePaymentRequirement(value: unknown, cap: bigint): PaymentRequirement {
   if (!isRecord(value)
     || value.error !== "Payment Required"
     || typeof value.priceUsdc !== "string"
@@ -145,8 +182,6 @@ function validatePaymentRequirement(value: unknown, cap: bigint): void {
   } catch (cause) {
     throw protocolError("invalid_payment_response", "Invalid HTTP 402 payment recipient.", { cause });
   }
-  void payTo;
-
   if (value.chainId !== 8453 && value.chainId !== 84532) {
     throw protocolError("unsupported_chain", "HTTP 402 payment response specifies an unsupported chain.");
   }
@@ -162,6 +197,8 @@ function validatePaymentRequirement(value: unknown, cap: bigint): void {
   if (price > cap) {
     throw protocolError("payment_limit_exceeded", "HTTP 402 payment exceeds maxPaymentUsdc.");
   }
+
+  return { chainId: value.chainId, payTo, amount: price };
 }
 
 async function paymentRequirementFrom(response: Response): Promise<unknown> {
@@ -177,13 +214,54 @@ export function createAgentFetch(
   dependencies: AgentFetchDependencies = defaultDependencies,
 ): AgentFetch {
   const { cap } = validateConfig(config);
+  const confirmations = config.confirmations ?? 1;
 
   return async (input, init) => {
     const request = new Request(input, init);
     const response = await dependencies.fetch(request.clone());
     if (response.status !== 402) return response;
 
-    validatePaymentRequirement(await paymentRequirementFrom(response), cap);
-    return response;
+    const requirement = validatePaymentRequirement(await paymentRequirementFrom(response), cap);
+    const runtime = dependencies.createPaymentRuntime({
+      privateKey: config.privateKey,
+      rpcUrl: config.rpcUrl,
+      chainId: requirement.chainId,
+    });
+
+    let rpcChainId: number;
+    try {
+      rpcChainId = await runtime.getChainId();
+    } catch (cause) {
+      throw new X402PaymentError("transfer_failed", "Could not determine the RPC chain ID.", { cause });
+    }
+    if (rpcChainId !== requirement.chainId) {
+      throw new X402PaymentError("rpc_chain_mismatch", "RPC chain ID does not match the payment requirement.");
+    }
+
+    let hash: Hash;
+    try {
+      hash = await runtime.transferUsdc({
+        token: usdcAddresses[requirement.chainId],
+        to: requirement.payTo,
+        amount: requirement.amount,
+      });
+    } catch (cause) {
+      throw new X402PaymentError("transfer_failed", "USDC transfer failed.", { cause });
+    }
+
+    let receipt: { status: "success" | "reverted" };
+    try {
+      receipt = await runtime.waitForReceipt(hash, confirmations);
+    } catch (cause) {
+      throw new X402PaymentError("transfer_failed", "USDC transfer confirmation failed.", { cause });
+    }
+    if (receipt.status === "reverted") {
+      throw new X402PaymentError("transaction_failed", "USDC transfer transaction reverted.");
+    }
+
+    const retryRequest = request.clone();
+    const retryHeaders = new Headers(retryRequest.headers);
+    retryHeaders.set(PAYMENT_HEADER, hash);
+    return dependencies.fetch(new Request(retryRequest, { headers: retryHeaders }));
   };
 }
