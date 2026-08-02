@@ -9,10 +9,15 @@ import { describe, expect, test, vi } from "vitest";
 
 import {
   createPaymentVerifier,
+  getUsdcAddress,
   type ReceiptClient,
 } from "../src/index.js";
 
 describe("createPaymentVerifier", () => {
+  test("returns the official checksummed Base USDC address", () => {
+    expect(getUsdcAddress(8453)).toBe("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
+  });
+
   test("accepts a successful USDC Transfer that covers the required price", async () => {
     const hash = `0x${"a".repeat(64)}` as Hash;
     const payTo = "0x1111111111111111111111111111111111111111" as Address;
