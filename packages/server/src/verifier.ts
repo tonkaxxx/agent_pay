@@ -5,8 +5,10 @@ import {
   decodeEventLog,
   getAddress,
   isAddressEqual,
+  isHash,
   parseAbi,
   parseUnits,
+  TransactionReceiptNotFoundError,
 } from "viem";
 
 const usdcAddresses: Record<SupportedChainId, Address> = {
@@ -41,17 +43,25 @@ export interface ReplayStore {
 }
 
 export class InMemoryReplayStore implements ReplayStore {
-  readonly #claimed = new Set<string>();
+  readonly #used = new Set<string>();
 
   claim(key: string): boolean {
-    if (this.#claimed.has(key)) return false;
-    this.#claimed.add(key);
+    if (this.#used.has(key)) return false;
+    this.#used.add(key);
     return true;
   }
 }
 
-/** Temporary open union; Task 2 supplies the public closed set of reasons. */
-export type PaymentFailureReason = string;
+const defaultReplayStore = new InMemoryReplayStore();
+
+export type PaymentFailureReason =
+  | "invalid_tx_hash"
+  | "transaction_not_found"
+  | "transaction_failed"
+  | "insufficient_confirmations"
+  | "insufficient_payment"
+  | "transaction_replayed"
+  | "verification_unavailable";
 
 export type PaymentVerificationResult =
   | { valid: true }
@@ -62,6 +72,7 @@ export type PaymentVerifier = (txHash: string) => Promise<PaymentVerificationRes
 export interface CreatePaymentVerifierOptions {
   requirements: PaymentRequirements;
   publicClient: ReceiptClient;
+  confirmations?: number;
   replayStore?: ReplayStore;
 }
 
@@ -72,6 +83,8 @@ export function getUsdcAddress(chainId: SupportedChainId): Address {
 export function createPaymentVerifier({
   requirements,
   publicClient,
+  confirmations = 1,
+  replayStore = defaultReplayStore,
 }: CreatePaymentVerifierOptions): PaymentVerifier {
   if (!usdcPricePattern.test(requirements.priceUsdc)) {
     throw new Error("priceUsdc must be a USDC amount with at most six decimal places");
@@ -86,9 +99,32 @@ export function createPaymentVerifier({
   const usdcAddress = getUsdcAddress(requirements.chainId);
 
   return async (txHash) => {
-    const receipt = await publicClient.getTransactionReceipt({ hash: txHash as Hash });
+    if (!isHash(txHash)) {
+      return { valid: false, reason: "invalid_tx_hash", retryable: false };
+    }
+
+    let receipt: Awaited<ReturnType<ReceiptClient["getTransactionReceipt"]>>;
+    try {
+      receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+    } catch (error) {
+      if (error instanceof TransactionReceiptNotFoundError) {
+        return { valid: false, reason: "transaction_not_found", retryable: false };
+      }
+      return { valid: false, reason: "verification_unavailable", retryable: true };
+    }
+
     if (receipt.status !== "success") {
-      return { valid: false, reason: "transaction_reverted", retryable: false };
+      return { valid: false, reason: "transaction_failed", retryable: false };
+    }
+
+    try {
+      const latestBlock = await publicClient.getBlockNumber();
+      const receiptConfirmations = latestBlock - receipt.blockNumber + 1n;
+      if (receiptConfirmations < BigInt(confirmations)) {
+        return { valid: false, reason: "insufficient_confirmations", retryable: false };
+      }
+    } catch {
+      return { valid: false, reason: "verification_unavailable", retryable: true };
     }
 
     let paid = 0n;
@@ -106,8 +142,14 @@ export function createPaymentVerifier({
       }
     }
 
-    return paid >= requiredAmount
-      ? { valid: true }
-      : { valid: false, reason: "insufficient_payment", retryable: false };
+    if (paid < requiredAmount) {
+      return { valid: false, reason: "insufficient_payment", retryable: false };
+    }
+
+    if (!(await replayStore.claim(`${requirements.chainId}:${txHash.toLowerCase()}`))) {
+      return { valid: false, reason: "transaction_replayed", retryable: false };
+    }
+
+    return { valid: true };
   };
 }

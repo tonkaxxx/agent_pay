@@ -4,14 +4,73 @@ import {
   encodeAbiParameters,
   encodeEventTopics,
   parseAbi,
+  TransactionReceiptNotFoundError,
 } from "viem";
 import { describe, expect, test, vi } from "vitest";
 
 import {
   createPaymentVerifier,
   getUsdcAddress,
+  InMemoryReplayStore,
+  type PaymentVerifier,
   type ReceiptClient,
 } from "../src/index.js";
+
+const hash = `0x${"a".repeat(64)}` as Hash;
+const payTo = "0x1111111111111111111111111111111111111111" as Address;
+const from = "0x2222222222222222222222222222222222222222" as Address;
+const usdc = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address;
+type TestReceipt = Awaited<ReturnType<ReceiptClient["getTransactionReceipt"]>>;
+const otherToken = "0x3333333333333333333333333333333333333333" as Address;
+const otherRecipient = "0x4444444444444444444444444444444444444444" as Address;
+const transferAbi = parseAbi([
+  "event Transfer(address indexed from, address indexed to, uint256 value)",
+]);
+
+function makeReceipt({
+  status = "success",
+  token = usdc,
+  to = payTo,
+  values = [10_000n],
+}: {
+  status?: "success" | "reverted";
+  token?: Address;
+  to?: Address;
+  values?: readonly bigint[];
+} = {}): TestReceipt {
+  return {
+    status,
+    blockNumber: 100n,
+    logs: values.map((value) => ({
+      address: token,
+      topics: encodeEventTopics({
+        abi: transferAbi,
+        eventName: "Transfer",
+        args: { from, to },
+      }),
+      data: encodeAbiParameters([{ type: "uint256" }], [value]),
+    })),
+  };
+}
+
+function makeClient(
+  testReceipt: TestReceipt,
+  latestBlock = testReceipt.blockNumber,
+): ReceiptClient {
+  return {
+    getTransactionReceipt: vi.fn().mockResolvedValue(testReceipt),
+    getBlockNumber: vi.fn().mockResolvedValue(latestBlock),
+  };
+}
+
+function verifierFor(client: ReceiptClient, confirmations = 1): PaymentVerifier {
+  return createPaymentVerifier({
+    requirements: { priceUsdc: "0.01", payTo, chainId: 84532 },
+    publicClient: client,
+    confirmations,
+    replayStore: new InMemoryReplayStore(),
+  });
+}
 
 describe("createPaymentVerifier", () => {
   test("returns the official checksummed Base USDC address", () => {
@@ -19,29 +78,106 @@ describe("createPaymentVerifier", () => {
   });
 
   test("accepts a successful USDC Transfer that covers the required price", async () => {
-    const hash = `0x${"a".repeat(64)}` as Hash;
-    const payTo = "0x1111111111111111111111111111111111111111" as Address;
-    const from = "0x2222222222222222222222222222222222222222" as Address;
-    const usdc = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address;
-    const topics = encodeEventTopics({
-      abi: parseAbi(["event Transfer(address indexed from, address indexed to, uint256 value)"]),
-      eventName: "Transfer",
-      args: { from, to: payTo },
+    await expect(verifierFor(makeClient(makeReceipt()))(hash)).resolves.toEqual({ valid: true });
+  });
+
+  test("rejects malformed transaction hashes", async () => {
+    const verify = verifierFor(makeClient(makeReceipt()));
+
+    await expect(verify("not-a-hash")).resolves.toMatchObject({
+      valid: false,
+      reason: "invalid_tx_hash",
+      retryable: false,
     });
-    const data = encodeAbiParameters([{ type: "uint256" }], [10_000n]);
+  });
+
+  test("rejects reverted transactions", async () => {
+    await expect(verifierFor(makeClient(makeReceipt({ status: "reverted" })))(hash)).resolves.toMatchObject({
+      valid: false,
+      reason: "transaction_failed",
+    });
+  });
+
+  test("rejects transfers from another token", async () => {
+    await expect(verifierFor(makeClient(makeReceipt({ token: otherToken })))(hash)).resolves.toMatchObject({
+      valid: false,
+      reason: "insufficient_payment",
+    });
+  });
+
+  test("rejects transfers to another recipient", async () => {
+    await expect(verifierFor(makeClient(makeReceipt({ to: otherRecipient })))(hash)).resolves.toMatchObject({
+      valid: false,
+      reason: "insufficient_payment",
+    });
+  });
+
+  test("rejects transfers below the required amount", async () => {
+    await expect(verifierFor(makeClient(makeReceipt({ values: [9_999n] })))(hash)).resolves.toMatchObject({
+      valid: false,
+      reason: "insufficient_payment",
+    });
+  });
+
+  test("accepts a payment split across matching transfer logs", async () => {
+    await expect(verifierFor(makeClient(makeReceipt({ values: [6_000n, 4_000n] })))(hash)).resolves.toEqual({
+      valid: true,
+    });
+  });
+
+  test("rejects transactions without enough confirmations", async () => {
+    await expect(verifierFor(makeClient(makeReceipt(), 100n), 2)(hash)).resolves.toMatchObject({
+      valid: false,
+      reason: "insufficient_confirmations",
+      retryable: false,
+    });
+  });
+
+  test("maps missing receipts to a non-retryable failure", async () => {
     const client: ReceiptClient = {
-      getTransactionReceipt: vi.fn().mockResolvedValue({
-        status: "success",
-        blockNumber: 100n,
-        logs: [{ address: usdc, topics, data }],
-      }),
-      getBlockNumber: vi.fn().mockResolvedValue(100n),
+      getTransactionReceipt: vi.fn().mockRejectedValue(new TransactionReceiptNotFoundError({ hash })),
+      getBlockNumber: vi.fn(),
     };
-    const verify = createPaymentVerifier({
-      requirements: { priceUsdc: "0.01", payTo, chainId: 84532 },
-      publicClient: client,
+
+    await expect(verifierFor(client)(hash)).resolves.toMatchObject({
+      valid: false,
+      reason: "transaction_not_found",
+      retryable: false,
     });
+  });
+
+  test("maps RPC failures to a retryable failure", async () => {
+    const client: ReceiptClient = {
+      getTransactionReceipt: vi.fn().mockRejectedValue(new Error("RPC unavailable")),
+      getBlockNumber: vi.fn(),
+    };
+
+    await expect(verifierFor(client)(hash)).resolves.toMatchObject({
+      valid: false,
+      reason: "verification_unavailable",
+      retryable: true,
+    });
+  });
+
+  test("rejects a previously accepted transaction hash", async () => {
+    const verify = verifierFor(makeClient(makeReceipt()));
 
     await expect(verify(hash)).resolves.toEqual({ valid: true });
+    await expect(verify(hash)).resolves.toMatchObject({
+      valid: false,
+      reason: "transaction_replayed",
+      retryable: false,
+    });
+  });
+
+  test("atomically rejects one of two concurrent claims for the same hash", async () => {
+    const verify = verifierFor(makeClient(makeReceipt()));
+
+    const results = await Promise.all([verify(hash), verify(hash)]);
+
+    expect(results).toEqual(expect.arrayContaining([
+      { valid: true },
+      { valid: false, reason: "transaction_replayed", retryable: false },
+    ]));
   });
 });
