@@ -10,7 +10,9 @@
     "typecheck": "corepack pnpm --recursive --filter './packages/*' run typecheck && tsc -p tsconfig.json",
     "test": "vitest run",
     "demo:vendor": "tsx examples/vendor-api.ts",
-    "demo:agent": "tsx examples/ai-agent.ts"
+    "demo:agent": "tsx examples/ai-agent.ts",
+    "demo:vendor:mainnet": "tsx examples/vendor-api.ts --mainnet",
+    "demo:agent:mainnet": "tsx examples/ai-agent.ts --mainnet"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

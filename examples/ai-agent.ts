@@ -1,50 +1,112 @@
 import "dotenv/config";
 
-import { createAgentFetch } from "@x402/client";
+import { pathToFileURL } from "node:url";
+import { privateKeyToAccount } from "viem/accounts";
 
-type Hex = `0x${string}`;
+import {
+  createAgentFetch,
+  X402ProtocolError,
+  type AgentFetchConfig,
+} from "@x402/client";
 
-function requiredEnvironment(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} must be set.`);
-  return value;
+import {
+  DEMO_PRICE_USDC,
+  executeRequested,
+  loadDemoEnvironment,
+  modeFromArguments,
+  validatedPrivateKey,
+  vendorApiUrlFromEnvironment,
+} from "./demo-config.js";
+import {
+  MainnetPreflightError,
+  authorizeMainnetPayment,
+  createMainnetPreflightRuntime,
+} from "./mainnet-preflight.js";
+
+export interface AgentDemoDependencies {
+  createAgentFetch: typeof createAgentFetch;
+  createMainnetPreflightRuntime: typeof createMainnetPreflightRuntime;
+  log(message: string): void;
 }
 
-function validatedRpcUrl(value: string): string {
-  const url = new URL(value);
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("BASE_SEPOLIA_RPC_URL must use HTTP or HTTPS.");
-  }
-  return url.href;
-}
+const defaultAgentDemoDependencies: AgentDemoDependencies = {
+  createAgentFetch,
+  createMainnetPreflightRuntime,
+  log: console.log,
+};
 
-function validatedPrivateKey(value: string): Hex {
-  if (!/^0x[\da-fA-F]{64}$/.test(value)) {
-    throw new Error("AGENT_PRIVATE_KEY must be a 32-byte hexadecimal private key.");
-  }
-  return value as Hex;
-}
+export async function runAgentDemo(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv | Readonly<Record<string, string | undefined>>,
+  dependencies: AgentDemoDependencies = defaultAgentDemoDependencies,
+): Promise<void> {
+  const mode = modeFromArguments(args);
+  const environment = loadDemoEnvironment(mode, env);
+  const privateKey = validatedPrivateKey(env.AGENT_PRIVATE_KEY);
+  const vendorApiUrl = vendorApiUrlFromEnvironment(environment, env);
+  let successfulPreview = false;
 
-async function main(): Promise<void> {
-  const privateKey = validatedPrivateKey(requiredEnvironment("AGENT_PRIVATE_KEY"));
-  const rpcUrl = validatedRpcUrl(requiredEnvironment("BASE_SEPOLIA_RPC_URL"));
-  const vendorApiUrl = process.env.VENDOR_API_URL ?? "http://localhost:3000/api/data";
-  const agentFetch = createAgentFetch({
+  let agentFetchConfig: AgentFetchConfig = {
     privateKey,
-    rpcUrl,
+    rpcUrl: environment.rpcUrl,
     maxPaymentUsdc: "0.10",
-  });
+  };
 
-  const response = await agentFetch(vendorApiUrl);
+  if (environment.network.realFunds) {
+    const agentAddress = privateKeyToAccount(privateKey).address;
+    const runtime = dependencies.createMainnetPreflightRuntime(environment.rpcUrl);
+    agentFetchConfig = {
+      privateKey,
+      rpcUrl: environment.rpcUrl,
+      maxPaymentUsdc: DEMO_PRICE_USDC,
+      authorizePayment: async (context) => {
+        const authorized = await authorizeMainnetPayment({
+          context,
+          runtime,
+          agentAddress,
+          expectedPayTo: environment.vendorWalletAddress,
+          expectedRequestUrl: vendorApiUrl,
+          executeRequested: executeRequested(args),
+          mainnetAllowed: environment.mainnetAllowed,
+          log: dependencies.log,
+        });
+        if (!authorized) successfulPreview = true;
+        return authorized;
+      },
+      onTransactionSubmitted: ({ hash }) => {
+        dependencies.log(`Transaction submitted: ${hash}`);
+        dependencies.log(`Explorer: ${environment.network.explorerUrl}/tx/${hash}`);
+        dependencies.log("WARNING: PAYMENT SUBMITTED. DO NOT RERUN THIS COMMAND.");
+      },
+    };
+  }
+
+  const agentFetch = dependencies.createAgentFetch(agentFetchConfig);
+
+  let response: Response;
+  try {
+    response = environment.network.realFunds
+      ? await agentFetch(vendorApiUrl, { redirect: "error" })
+      : await agentFetch(vendorApiUrl);
+  } catch (error) {
+    if (error instanceof X402ProtocolError && error.code === "payment_not_authorized") {
+      if (error.cause instanceof MainnetPreflightError) throw error.cause;
+      if (successfulPreview) return;
+    }
+    throw error;
+  }
+
   if (!response.ok) {
     throw new Error(`Vendor API request failed with HTTP ${response.status}.`);
   }
 
-  console.log(`Vendor API status: ${response.status}`);
-  console.log(await response.json());
+  dependencies.log(`Vendor API status: ${response.status}`);
+  dependencies.log(JSON.stringify(await response.json()));
 }
 
-void main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : "Agent request failed.");
-  process.exitCode = 1;
-});
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  void runAgentDemo(process.argv.slice(2), process.env).catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : "Agent request failed.");
+    process.exitCode = 1;
+  });
+}
