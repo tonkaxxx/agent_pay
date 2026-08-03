@@ -23,9 +23,15 @@ pnpm build
 ```
 
 Replace the example recipient and private key in `.env` before using the
-payment demo. Keep `.env` out of source control.
+payment demo. The placeholder addresses and key in `.env.example` are public
+examples: do not fund them. Keep `.env` out of source control.
 
 ## Run the Base Sepolia demo
+
+The existing demo commands always select Base Sepolia (chain `84532`). They
+remain testnet-only defaults even if `.env` contains a mainnet RPC URL or
+`ALLOW_MAINNET_PAYMENTS=true`; use the explicitly named `:mainnet` commands
+below for the gated mainnet flow.
 
 In Terminal A, start the vendor API:
 
@@ -43,6 +49,54 @@ The first request receives an HTTP 402 body containing the price, Base Sepolia
 chain ID, and recipient. The agent accepts the requirement only when it is at
 or below its `$0.10` cap, transfers test USDC, waits for confirmation, then
 retries the original URL with `X-Payment-Tx`.
+
+## Run the guarded Base Mainnet demo
+
+Base Mainnet uses real funds. Complete this checklist before running either
+mainnet command:
+
+- Replace the `.env.example` placeholder recipient and private key; do not
+  fund the placeholders.
+- Fund the agent's dedicated wallet with official Base USDC and enough Base ETH
+  for gas. The vendor needs only a controlled recipient address to receive the
+  payment.
+- Set `BASE_MAINNET_RPC_URL` to a Base Mainnet RPC URL,
+  `VENDOR_API_URL=http://127.0.0.1:3000/api/data`, and
+  `ALLOW_MAINNET_PAYMENTS=true` in `.env`.
+
+In Terminal A, start the loopback-only vendor:
+
+```sh
+pnpm demo:vendor:mainnet
+```
+
+Before using the agent, inspect the raw 402 response locally:
+
+```sh
+curl -i http://127.0.0.1:3000/api/data
+```
+
+Verify that it contains `priceUsdc: "0.01"`, `network: "base"`, chain `8453`,
+and the exact controlled recipient address configured in `VENDOR_WALLET_ADDRESS`.
+
+In Terminal B, run the default non-paying preview:
+
+```sh
+pnpm demo:agent:mainnet
+```
+
+The preview performs mainnet preflight checks but does not send a payment.
+Confirm that its output ends with `PAYMENT NOT SENT` before deciding whether to
+execute. To authorize exactly one payment after that confirmation, run:
+
+```sh
+pnpm demo:agent:mainnet -- --execute
+```
+
+If the execution prints a transaction hash and anything later fails, inspect
+that hash in a Base explorer before any rerun. The replay store is in-memory
+and refunds are unavailable. This mainnet demo listens only on loopback and is
+not a production deployment.
 
 ## Use the packages
 
