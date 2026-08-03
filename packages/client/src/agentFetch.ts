@@ -72,6 +72,8 @@ export interface AgentFetchConfig {
   rpcUrl: string;
   maxPaymentUsdc?: string;
   confirmations?: number;
+  paymentVerificationRetries?: number;
+  paymentVerificationRetryDelayMs?: number;
   authorizePayment?: (
     context: PaymentAuthorizationContext,
   ) => boolean | Promise<boolean>;
@@ -149,7 +151,11 @@ function parsePositiveUsdc(value: unknown): bigint | undefined {
   return amount > 0n ? amount : undefined;
 }
 
-function validateConfig(config: AgentFetchConfig): { cap: bigint } {
+function validateConfig(config: AgentFetchConfig): {
+  cap: bigint;
+  paymentVerificationRetries: number;
+  paymentVerificationRetryDelayMs: number;
+} {
   privateKeyToAccount(config.privateKey);
 
   let rpcUrl: URL;
@@ -170,7 +176,24 @@ function validateConfig(config: AgentFetchConfig): { cap: bigint } {
     throw new RangeError("confirmations must be a positive integer.");
   }
 
-  return { cap };
+  const paymentVerificationRetries = nonNegativeInteger(
+    config.paymentVerificationRetries,
+    "paymentVerificationRetries",
+  );
+  const paymentVerificationRetryDelayMs = nonNegativeInteger(
+    config.paymentVerificationRetryDelayMs,
+    "paymentVerificationRetryDelayMs",
+  );
+
+  return { cap, paymentVerificationRetries, paymentVerificationRetryDelayMs };
+}
+
+function nonNegativeInteger(value: unknown, name: string): number {
+  if (value === undefined) return 0;
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new RangeError(`${name} must be a non-negative integer.`);
+  }
+  return value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -242,11 +265,25 @@ async function paymentRequirementFrom(response: Response): Promise<unknown> {
   }
 }
 
+async function isTemporaryPaymentVerificationFailure(response: Response): Promise<boolean> {
+  if (response.status !== 503) return false;
+  try {
+    const body: unknown = await response.clone().json();
+    return isRecord(body) && body.error === "Payment Verification Unavailable";
+  } catch {
+    return false;
+  }
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 export function createAgentFetch(
   config: AgentFetchConfig,
   dependencies: AgentFetchDependencies = defaultDependencies,
 ): AgentFetch {
-  const { cap } = validateConfig(config);
+  const { cap, paymentVerificationRetries, paymentVerificationRetryDelayMs } = validateConfig(config);
   const confirmations = config.confirmations ?? 1;
 
   return async (input, init) => {
@@ -339,6 +376,16 @@ export function createAgentFetch(
     const retryRequest = request.clone();
     const retryHeaders = new Headers(retryRequest.headers);
     retryHeaders.set(PAYMENT_HEADER, hash);
-    return dependencies.fetch(new Request(retryRequest, { headers: retryHeaders }));
+    let retryResponse = await dependencies.fetch(new Request(retryRequest.clone(), {
+      headers: retryHeaders,
+    }));
+    for (let attempt = 0; attempt < paymentVerificationRetries; attempt += 1) {
+      if (!await isTemporaryPaymentVerificationFailure(retryResponse)) return retryResponse;
+      if (paymentVerificationRetryDelayMs > 0) await wait(paymentVerificationRetryDelayMs);
+      retryResponse = await dependencies.fetch(new Request(retryRequest.clone(), {
+        headers: retryHeaders,
+      }));
+    }
+    return retryResponse;
   };
 }

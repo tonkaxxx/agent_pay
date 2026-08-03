@@ -21,6 +21,16 @@ function paymentRequired(payload: unknown): Response {
   });
 }
 
+function paymentVerificationUnavailable(): Response {
+  return new Response(JSON.stringify({
+    error: "Payment Verification Unavailable",
+    reason: "transaction_not_found",
+  }), {
+    status: 503,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 function dependenciesFor() {
   const fetch = vi.fn<typeof globalThis.fetch>();
   const createPaymentRuntime = vi.fn();
@@ -48,6 +58,20 @@ function paymentRuntime(overrides: Partial<PaymentRuntime> = {}): PaymentRuntime
 }
 
 describe("createAgentFetch", () => {
+  test.each([
+    ["paymentVerificationRetries", -1],
+    ["paymentVerificationRetries", 0.5],
+    ["paymentVerificationRetries", Number.MAX_SAFE_INTEGER + 1],
+    ["paymentVerificationRetryDelayMs", -1],
+    ["paymentVerificationRetryDelayMs", 0.5],
+  ] as const)("rejects an invalid %s value", (option, value) => {
+    expect(() => createAgentFetch({
+      privateKey,
+      rpcUrl,
+      [option]: value,
+    })).toThrow(/must be a non-negative integer/);
+  });
+
   test("returns the original non-402 response without creating a payment runtime", async () => {
     const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
     const ok = new Response(JSON.stringify({ ok: true }), { status: 200 });
@@ -113,6 +137,47 @@ describe("createAgentFetch", () => {
     expect(retryRequest.headers.get("x-agent")).toBe("demo");
     expect(retryRequest.headers.get("X-Payment-Tx")).toBe(hash);
     await expect(retryRequest.text()).resolves.toBe(JSON.stringify({ prompt: "hello" }));
+  });
+
+  test("retries temporary receipt verification with the submitted hash without another transfer", async () => {
+    const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
+    const runtime = paymentRuntime();
+    createPaymentRuntime.mockReturnValue(runtime);
+    fetch
+      .mockResolvedValueOnce(paymentRequired(validPaymentRequirement()))
+      .mockResolvedValueOnce(paymentVerificationUnavailable())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: "paid" }), { status: 200 }));
+    const agentFetch = createAgentFetch({
+      privateKey,
+      rpcUrl,
+      paymentVerificationRetries: 1,
+      paymentVerificationRetryDelayMs: 0,
+    }, dependencies);
+
+    await expect(agentFetch("https://vendor.example/data")).resolves.toMatchObject({ status: 200 });
+    expect(runtime.transferUsdc).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect((fetch.mock.calls[2]?.[0] as Request).headers.get("X-Payment-Tx")).toBe(hash);
+  });
+
+  test("returns an unrelated service-unavailable response without retrying it", async () => {
+    const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
+    const runtime = paymentRuntime();
+    createPaymentRuntime.mockReturnValue(runtime);
+    const unavailable = new Response("maintenance", { status: 503 });
+    fetch
+      .mockResolvedValueOnce(paymentRequired(validPaymentRequirement()))
+      .mockResolvedValueOnce(unavailable);
+    const agentFetch = createAgentFetch({
+      privateKey,
+      rpcUrl,
+      paymentVerificationRetries: 1,
+      paymentVerificationRetryDelayMs: 0,
+    }, dependencies);
+
+    await expect(agentFetch("https://vendor.example/data")).resolves.toBe(unavailable);
+    expect(runtime.transferUsdc).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   test("rejects a payment when the RPC chain does not match the validated requirement", async () => {

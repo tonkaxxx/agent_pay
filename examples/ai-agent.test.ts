@@ -152,6 +152,18 @@ describe("runAgentDemo", () => {
     expect(createAgentFetch.mock.calls[0]![0].maxPaymentUsdc).toBe("0.01");
   });
 
+  test("waits for extra confirmation and retries temporary verification only on mainnet", async () => {
+    const { dependencies, createAgentFetch } = dependenciesForAgent();
+
+    await runAgentDemo("mainnet", [], mainnetEnvironment, dependencies);
+
+    expect(createAgentFetch.mock.calls[0]![0]).toMatchObject({
+      confirmations: 2,
+      paymentVerificationRetries: 3,
+      paymentVerificationRetryDelayMs: 1_000,
+    });
+  });
+
   test("passes redirect:error for a mainnet request", async () => {
     const { dependencies, agentFetch } = dependenciesForAgent();
     await runAgentDemo("mainnet", [], mainnetEnvironment, dependencies);

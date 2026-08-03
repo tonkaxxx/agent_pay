@@ -63,6 +63,9 @@ export async function runAgentDemo(
       privateKey,
       rpcUrl: environment.rpcUrl,
       maxPaymentUsdc: DEMO_PRICE_USDC,
+      confirmations: 2,
+      paymentVerificationRetries: 3,
+      paymentVerificationRetryDelayMs: 1_000,
       authorizePayment: async (context) => {
         const authorized = await authorizeMainnetPayment({
           context,
