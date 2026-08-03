@@ -5,71 +5,70 @@ import { pathToFileURL } from "node:url";
 
 import { paymentMiddleware } from "@x402/server";
 
+import {
+  DEMO_PRICE_USDC,
+  assertMainnetAllowed,
+  loadDemoEnvironment,
+  modeFromArguments,
+  type DemoEnvironment,
+  type DemoNetwork,
+} from "./demo-config.js";
+
 type Address = `0x${string}`;
 
 export function createVendorApp(config: {
   vendorWalletAddress: Address;
   rpcUrl: string;
+  network: DemoNetwork;
 }) {
   const app = express();
   app.get(
     "/api/data",
     paymentMiddleware({
-      priceUsdc: "0.01",
+      priceUsdc: DEMO_PRICE_USDC,
       payTo: config.vendorWalletAddress,
-      chainId: 84532,
+      chainId: config.network.chainId,
       rpcUrl: config.rpcUrl,
     }),
     (_request, response) => response.json({
       data: "The paid signal is 42.",
       paidWith: "USDC",
-      network: "base-sepolia",
+      network: config.network.network,
     }),
   );
   return app;
 }
 
-function requiredEnvironment(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} must be set.`);
-  return value;
-}
-
-function validatedRpcUrl(value: string): string {
-  const url = new URL(value);
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("BASE_SEPOLIA_RPC_URL must use HTTP or HTTPS.");
-  }
-  return url.href;
-}
-
-function validatedAddress(value: string): Address {
-  if (!/^0x[\da-fA-F]{40}$/.test(value)) {
-    throw new Error("VENDOR_WALLET_ADDRESS must be a 20-byte hexadecimal address.");
-  }
-  return value as Address;
-}
-
-function portFromEnvironment(): number {
-  const value = process.env.PORT ?? "3000";
-  const port = Number(value);
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new Error("PORT must be an integer between 1 and 65535.");
-  }
-  return port;
+export function vendorRuntimeConfiguration(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv | Readonly<Record<string, string | undefined>>,
+): DemoEnvironment {
+  const config = loadDemoEnvironment(modeFromArguments(args), env);
+  if (config.network.realFunds) assertMainnetAllowed(env);
+  return config;
 }
 
 function main(): void {
-  const vendorWalletAddress = validatedAddress(requiredEnvironment("VENDOR_WALLET_ADDRESS"));
-  const rpcUrl = validatedRpcUrl(requiredEnvironment("BASE_SEPOLIA_RPC_URL"));
-  const port = portFromEnvironment();
-  const app = createVendorApp({ vendorWalletAddress, rpcUrl });
+  const config = vendorRuntimeConfiguration(process.argv.slice(2), process.env);
+  const app = createVendorApp(config);
+  const onListening = () => {
+    if (config.network.realFunds) {
+      console.log("BASE MAINNET / REAL FUNDS");
+    }
+    console.log(`Vendor API: http://${config.network.realFunds ? "127.0.0.1" : "localhost"}:${config.port}/api/data`);
+    console.log(`Price: ${DEMO_PRICE_USDC} USDC`);
+    console.log(`Recipient: ${config.vendorWalletAddress}`);
+    if (config.network.realFunds) {
+      console.log("Replay store: in-memory only");
+      console.log("Refunds: unavailable");
+    }
+  };
 
-  app.listen(port, () => {
-    console.log(`Vendor API: http://localhost:${port}/api/data`);
-    console.log("Price: 0.01 USDC");
-    console.log(`Recipient: ${vendorWalletAddress}`);
-  });
+  if (config.network.realFunds) {
+    app.listen(config.port, "127.0.0.1", onListening);
+  } else {
+    app.listen(config.port, onListening);
+  }
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
