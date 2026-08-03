@@ -91,7 +91,7 @@ export async function runAgentDemo(
   } catch (error) {
     if (error instanceof X402ProtocolError && error.code === "payment_not_authorized") {
       if (error.cause instanceof MainnetPreflightError) throw error.cause;
-      if (successfulPreview) return;
+      if (successfulPreview && error.cause === undefined) return;
     }
     throw error;
   }

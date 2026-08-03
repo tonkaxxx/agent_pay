@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 
 import {
   USDC_BASE,
+  X402PaymentError,
   X402ProtocolError,
   type AgentFetch,
   type AgentFetchConfig,
@@ -10,7 +11,10 @@ import {
 } from "@x402/client";
 
 import { runAgentDemo } from "./ai-agent.js";
-import type { MainnetPreflightRuntime } from "./mainnet-preflight.js";
+import {
+  MainnetPreflightError,
+  type MainnetPreflightRuntime,
+} from "./mainnet-preflight.js";
 
 const payTo = "0x1111111111111111111111111111111111111111" as Address;
 const hash = `0x${"ab".repeat(32)}` as Hash;
@@ -25,7 +29,9 @@ const context: PaymentAuthorizationContext = {
   amount: 10_000n,
 };
 
-function mainnetRuntime(): MainnetPreflightRuntime {
+function mainnetRuntime(
+  overrides: Partial<MainnetPreflightRuntime> = {},
+): MainnetPreflightRuntime {
   return {
     getChainId: vi.fn().mockResolvedValue(8453),
     getEthBalance: vi.fn().mockResolvedValue(1_000_000_000_000_000n),
@@ -33,6 +39,7 @@ function mainnetRuntime(): MainnetPreflightRuntime {
     simulateTransfer: vi.fn().mockResolvedValue(undefined),
     estimateTransferGas: vi.fn().mockResolvedValue(60_000n),
     estimateUpperFeePerGas: vi.fn().mockResolvedValue(1_000_000n),
+    ...overrides,
   };
 }
 
@@ -50,18 +57,33 @@ const mainnetEnvironment = {
   ALLOW_MAINNET_PAYMENTS: "true",
 };
 
-function dependenciesForAgent() {
+function dependenciesForAgent(options: {
+  runtime?: MainnetPreflightRuntime;
+  requestError?: Error;
+  denialCause?: Error;
+} = {}) {
   const log = vi.fn();
   const transferReached = vi.fn();
   const agentFetch = vi.fn();
   const createAgentFetch = vi.fn((config: AgentFetchConfig): AgentFetch => {
     agentFetch.mockImplementation(async () => {
+      if (options.requestError !== undefined) throw options.requestError;
       if (config.authorizePayment !== undefined) {
-        const authorized = await config.authorizePayment(context);
+        let authorized: boolean;
+        try {
+          authorized = await config.authorizePayment(context);
+        } catch (cause) {
+          throw new X402ProtocolError(
+            "payment_not_authorized",
+            "HTTP 402 payment authorization failed.",
+            { cause },
+          );
+        }
         if (!authorized) {
           throw new X402ProtocolError(
             "payment_not_authorized",
             "HTTP 402 payment was not authorized.",
+            options.denialCause === undefined ? undefined : { cause: options.denialCause },
           );
         }
       }
@@ -73,7 +95,9 @@ function dependenciesForAgent() {
     });
     return agentFetch as AgentFetch;
   });
-  const createMainnetPreflightRuntime = vi.fn().mockReturnValue(mainnetRuntime());
+  const createMainnetPreflightRuntime = vi.fn().mockReturnValue(
+    options.runtime ?? mainnetRuntime(),
+  );
   const dependencies = { createAgentFetch, createMainnetPreflightRuntime, log };
   return { dependencies, createAgentFetch, agentFetch, log, transferReached };
 }
@@ -99,6 +123,22 @@ describe("runAgentDemo", () => {
     expect(transferReached).not.toHaveBeenCalled();
   });
 
+  test("authorizes exact mainnet execute and reaches transfer", async () => {
+    const { dependencies, transferReached } = dependenciesForAgent();
+
+    await runAgentDemo(["--mainnet", "--execute"], mainnetEnvironment, dependencies);
+
+    expect(transferReached).toHaveBeenCalledOnce();
+  });
+
+  test("uses the exact one-cent payment cap for mainnet", async () => {
+    const { dependencies, createAgentFetch } = dependenciesForAgent();
+
+    await runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies);
+
+    expect(createAgentFetch.mock.calls[0]![0].maxPaymentUsdc).toBe("0.01");
+  });
+
   test("passes redirect:error for a mainnet request", async () => {
     const { dependencies, agentFetch } = dependenciesForAgent();
     await runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies);
@@ -116,6 +156,43 @@ describe("runAgentDemo", () => {
     expect(transferReached).not.toHaveBeenCalled();
   });
 
+  test("rethrows a wrapped preflight failure instead of treating it as preview", async () => {
+    const { dependencies, transferReached } = dependenciesForAgent({
+      runtime: mainnetRuntime({ getChainId: vi.fn().mockResolvedValue(84532) }),
+    });
+
+    await expect(runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies))
+      .rejects.toBeInstanceOf(MainnetPreflightError);
+    expect(transferReached).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ["unrelated payment_not_authorized", new X402ProtocolError(
+      "payment_not_authorized",
+      "Unrelated authorization denial.",
+    )],
+    ["fetch", new TypeError("fetch failed")],
+    ["transfer", new X402PaymentError("transfer_failed", "transfer failed")],
+    ["receipt", new X402PaymentError("transaction_failed", "receipt failed")],
+    ["retry", new TypeError("retry failed")],
+  ] as const)("propagates %s failure", async (_label, requestError) => {
+    const { dependencies } = dependenciesForAgent({ requestError });
+
+    await expect(runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies))
+      .rejects.toBe(requestError);
+  });
+
+  test("does not swallow an unrelated authorization cause after successful preview", async () => {
+    const denialCause = new Error("unrelated authorization failure");
+    const { dependencies } = dependenciesForAgent({ denialCause });
+
+    await expect(runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies))
+      .rejects.toMatchObject({
+        code: "payment_not_authorized",
+        cause: denialCause,
+      });
+  });
+
   test("prints submitted hash and explorer without printing the key", async () => {
     const { dependencies, createAgentFetch, log } = dependenciesForAgent();
     await runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies);
@@ -130,6 +207,7 @@ describe("runAgentDemo", () => {
     const output = log.mock.calls.flat().join("\n");
     expect(output).toContain(hash);
     expect(output).toContain(`https://base.blockscout.com/tx/${hash}`);
+    expect(output).toContain("DO NOT RERUN THIS COMMAND");
     expect(output).not.toContain(testPrivateKey);
   });
 });
