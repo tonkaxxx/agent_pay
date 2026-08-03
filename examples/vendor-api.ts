@@ -16,6 +16,11 @@ import {
 
 type Address = `0x${string}`;
 
+interface VendorAppServer {
+  listen(port: number, callback: () => void): unknown;
+  listen(port: number, hostname: string, callback: () => void): unknown;
+}
+
 export function createVendorApp(config: {
   vendorWalletAddress: Address;
   rpcUrl: string;
@@ -48,19 +53,21 @@ export function vendorRuntimeConfiguration(
   return config;
 }
 
-function main(): void {
-  const config = vendorRuntimeConfiguration(process.argv.slice(2), process.env);
-  const app = createVendorApp(config);
+export function startVendorApp(
+  config: DemoEnvironment,
+  app: VendorAppServer,
+  log: (message: string) => void,
+): void {
   const onListening = () => {
     if (config.network.realFunds) {
-      console.log("BASE MAINNET / REAL FUNDS");
+      log("BASE MAINNET / REAL FUNDS");
     }
-    console.log(`Vendor API: http://${config.network.realFunds ? "127.0.0.1" : "localhost"}:${config.port}/api/data`);
-    console.log(`Price: ${DEMO_PRICE_USDC} USDC`);
-    console.log(`Recipient: ${config.vendorWalletAddress}`);
+    log(`Vendor API: http://${config.network.realFunds ? "127.0.0.1" : "localhost"}:${config.port}/api/data`);
+    log(`Price: ${DEMO_PRICE_USDC} USDC`);
+    log(`Recipient: ${config.vendorWalletAddress}`);
     if (config.network.realFunds) {
-      console.log("Replay store: in-memory only");
-      console.log("Refunds: unavailable");
+      log("Replay store: in-memory only");
+      log("Refunds: unavailable");
     }
   };
 
@@ -69,6 +76,11 @@ function main(): void {
   } else {
     app.listen(config.port, onListening);
   }
+}
+
+function main(): void {
+  const config = vendorRuntimeConfiguration(process.argv.slice(2), process.env);
+  startVendorApp(config, createVendorApp(config), console.log);
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {

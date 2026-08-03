@@ -2,7 +2,11 @@ import request from "supertest";
 import { expect, test } from "vitest";
 
 import { DEMO_NETWORKS } from "./demo-config.js";
-import { createVendorApp, vendorRuntimeConfiguration } from "./vendor-api.js";
+import {
+  createVendorApp,
+  startVendorApp,
+  vendorRuntimeConfiguration,
+} from "./vendor-api.js";
 
 test.each([
   ["Sepolia", DEMO_NETWORKS.sepolia, "base-sepolia", 84532],
@@ -35,4 +39,58 @@ test("refuses mainnet Vendor startup without exact opt-in", () => {
     VENDOR_WALLET_ADDRESS: "0x1111111111111111111111111111111111111111",
     PORT: "3000",
   })).toThrow(/ALLOW_MAINNET_PAYMENTS/);
+});
+
+test("starts the mainnet Vendor server only on loopback and prints real-funds warnings", () => {
+  const calls: Array<{ port: number; hostname?: string }> = [];
+  const messages: string[] = [];
+  const server = {
+    listen(port: number, hostnameOrCallback: string | (() => void), callback?: () => void): void {
+      if (typeof hostnameOrCallback === "function") {
+        calls.push({ port });
+        hostnameOrCallback();
+      } else {
+        calls.push({ port, hostname: hostnameOrCallback });
+        callback?.();
+      }
+    },
+  };
+
+  startVendorApp(vendorRuntimeConfiguration(["--mainnet"], {
+    ALLOW_MAINNET_PAYMENTS: "true",
+    BASE_MAINNET_RPC_URL: "https://mainnet.base.org",
+    VENDOR_WALLET_ADDRESS: "0x1111111111111111111111111111111111111111",
+    PORT: "3000",
+  }), server, (message) => messages.push(message));
+
+  expect(calls).toEqual([{ port: 3000, hostname: "127.0.0.1" }]);
+  expect(messages).toEqual(expect.arrayContaining([
+    "BASE MAINNET / REAL FUNDS",
+    "Price: 0.01 USDC",
+    "Replay store: in-memory only",
+    "Refunds: unavailable",
+  ]));
+});
+
+test("starts the Sepolia Vendor server without a hostname", () => {
+  const calls: Array<{ port: number; hostname?: string }> = [];
+  const server = {
+    listen(port: number, hostnameOrCallback: string | (() => void), callback?: () => void): void {
+      if (typeof hostnameOrCallback === "function") {
+        calls.push({ port });
+        hostnameOrCallback();
+      } else {
+        calls.push({ port, hostname: hostnameOrCallback });
+        callback?.();
+      }
+    },
+  };
+
+  startVendorApp(vendorRuntimeConfiguration([], {
+    BASE_SEPOLIA_RPC_URL: "https://sepolia.base.org",
+    VENDOR_WALLET_ADDRESS: "0x1111111111111111111111111111111111111111",
+    PORT: "3000",
+  }), server, () => {});
+
+  expect(calls).toEqual([{ port: 3000 }]);
 });
