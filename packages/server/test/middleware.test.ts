@@ -6,6 +6,7 @@ import {
   encodeAbiParameters,
   encodeEventTopics,
   parseAbi,
+  TransactionReceiptNotFoundError,
 } from "viem";
 import { describe, expect, test, vi } from "vitest";
 
@@ -133,6 +134,19 @@ describe("paymentMiddleware", () => {
       .expect({
         error: "Payment Verification Unavailable",
         reason: "verification_unavailable",
+      });
+  });
+
+  test("returns a 503 while a newly submitted receipt is not visible yet", async () => {
+    await request(appFor(clientFor({
+      receiptError: new TransactionReceiptNotFoundError({ hash }),
+    })))
+      .get("/api/data")
+      .set(PAYMENT_HEADER, hash)
+      .expect(503)
+      .expect({
+        error: "Payment Verification Unavailable",
+        reason: "transaction_not_found",
       });
   });
 

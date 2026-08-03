@@ -136,7 +136,7 @@ export function createPaymentVerifier({
       receipt = await publicClient.getTransactionReceipt({ hash: txHash });
     } catch (error) {
       if (error instanceof TransactionReceiptNotFoundError) {
-        return { valid: false, reason: "transaction_not_found", retryable: false };
+        return { valid: false, reason: "transaction_not_found", retryable: true };
       }
       return { valid: false, reason: "verification_unavailable", retryable: true };
     }
@@ -149,7 +149,7 @@ export function createPaymentVerifier({
       const latestBlock = await publicClient.getBlockNumber();
       const receiptConfirmations = latestBlock - receipt.blockNumber + 1n;
       if (receiptConfirmations < BigInt(confirmations)) {
-        return { valid: false, reason: "insufficient_confirmations", retryable: false };
+        return { valid: false, reason: "insufficient_confirmations", retryable: true };
       }
     } catch {
       return { valid: false, reason: "verification_unavailable", retryable: true };

@@ -170,24 +170,24 @@ describe("createPaymentVerifier", () => {
     });
   });
 
-  test("rejects transactions without enough confirmations", async () => {
-    await expect(verifierFor(makeClient(makeReceipt(), 100n), 2)(hash)).resolves.toMatchObject({
+  test("marks transactions without enough confirmations as retryable", async () => {
+    await expect(verifierFor(makeClient(makeReceipt(), 100n), 2)(hash)).resolves.toEqual({
       valid: false,
       reason: "insufficient_confirmations",
-      retryable: false,
+      retryable: true,
     });
   });
 
-  test("maps missing receipts to a non-retryable failure", async () => {
+  test("marks missing receipts as retryable", async () => {
     const client: ReceiptClient = {
       getTransactionReceipt: vi.fn().mockRejectedValue(new TransactionReceiptNotFoundError({ hash })),
       getBlockNumber: vi.fn(),
     };
 
-    await expect(verifierFor(client)(hash)).resolves.toMatchObject({
+    await expect(verifierFor(client)(hash)).resolves.toEqual({
       valid: false,
       reason: "transaction_not_found",
-      retryable: false,
+      retryable: true,
     });
   });
 
