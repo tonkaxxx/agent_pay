@@ -85,15 +85,30 @@ function authorizationOptions(
 }
 
 describe("authorizeMainnetPayment", () => {
-  test("completes preflight but denies payment without --execute", async () => {
-    const log = vi.fn();
+  test("prints the exact public preflight in order and ends preview with PAYMENT NOT SENT", async () => {
+    const messages: string[] = [];
     const authorized = await authorizeMainnetPayment({
       ...authorizationOptions(runtime()),
-      log,
+      log: (message) => messages.push(message),
     });
 
     expect(authorized).toBe(false);
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("PAYMENT NOT SENT"));
+    expect(messages).toEqual([
+      "BASE MAINNET / REAL FUNDS",
+      `Agent address: ${agentAddress}`,
+      `Vendor URL: ${context.requestUrl}`,
+      "Chain ID: 8453",
+      `Recipient: ${payTo}`,
+      `USDC token: ${USDC_BASE}`,
+      "Price: 0.01 USDC (10000 base units)",
+      "USDC balance: 2 USDC",
+      "ETH balance: 0.001 ETH",
+      "Gas estimate: 60000 gas",
+      "Upper fee per gas: 1000000 wei",
+      "Buffered gas cost: 120000000000 wei",
+      "PAYMENT NOT SENT",
+    ]);
+    expect(messages.join("\n")).not.toContain(`0x${"11".repeat(32)}`);
   });
 
   test.each([
@@ -135,6 +150,25 @@ describe("authorizeMainnetPayment", () => {
     })).rejects.toBeInstanceOf(Error);
   });
 
+  test.each([
+    ["zero gas estimate", { estimateTransferGas: vi.fn().mockResolvedValue(0n) }],
+    ["negative gas estimate", { estimateTransferGas: vi.fn().mockResolvedValue(-1n) }],
+    ["zero upper fee", { estimateUpperFeePerGas: vi.fn().mockResolvedValue(0n) }],
+    ["negative upper fee", { estimateUpperFeePerGas: vi.fn().mockResolvedValue(-1n) }],
+  ] as const)("rejects a non-positive %s before gas-cost multiplication", async (
+    _label,
+    overrides,
+  ) => {
+    const log = vi.fn();
+
+    await expect(authorizeMainnetPayment({
+      ...authorizationOptions(runtime(overrides)),
+      log,
+    })).rejects.toBeInstanceOf(MainnetPreflightError);
+
+    expect(log).not.toHaveBeenCalled();
+  });
+
   test("rejects execute when the environment opt-in is absent", async () => {
     await expect(authorizeMainnetPayment({
       ...authorizationOptions(runtime()),
@@ -144,13 +178,22 @@ describe("authorizeMainnetPayment", () => {
     })).rejects.toThrow(/ALLOW_MAINNET_PAYMENTS/);
   });
 
-  test("authorizes exactly one-cent payment after all checks and both opt-ins", async () => {
+  test("repeats chain, recipient, and exact amount immediately before authorization", async () => {
+    const messages: string[] = [];
+
     await expect(authorizeMainnetPayment({
       ...authorizationOptions(runtime()),
       executeRequested: true,
       mainnetAllowed: true,
-      log: vi.fn(),
+      log: (message) => messages.push(message),
     })).resolves.toBe(true);
+
+    expect(messages.slice(-3)).toEqual([
+      "Chain ID: 8453",
+      `Recipient: ${payTo}`,
+      "Amount: 0.01 USDC (10000 base units)",
+    ]);
+    expect(messages).not.toContain("PAYMENT NOT SENT");
   });
 });
 
@@ -233,5 +276,40 @@ describe("createMainnetPreflightRuntime", () => {
     await expect(testRuntime.estimateUpperFeePerGas()).rejects.toBeInstanceOf(
       MainnetPreflightError,
     );
+  });
+
+  test("fails closed when the preferred max fee is zero instead of falling back", async () => {
+    const testClient = publicClient();
+    testClient.estimateFeesPerGas.mockResolvedValue({
+      maxFeePerGas: 0n,
+      gasPrice: 2_000_000n,
+    });
+    const { runtime: testRuntime } = adapterRuntime(testClient);
+
+    await expect(testRuntime.estimateUpperFeePerGas()).rejects.toBeInstanceOf(
+      MainnetPreflightError,
+    );
+  });
+
+  test("fails closed when the fallback gas price is zero", async () => {
+    const testClient = publicClient();
+    testClient.estimateFeesPerGas.mockResolvedValue({ gasPrice: 0n });
+    const { runtime: testRuntime } = adapterRuntime(testClient);
+
+    await expect(testRuntime.estimateUpperFeePerGas()).rejects.toBeInstanceOf(
+      MainnetPreflightError,
+    );
+  });
+
+  test("fails closed when the adapter receives a zero gas estimate", async () => {
+    const testClient = publicClient();
+    testClient.estimateContractGas.mockResolvedValue(0n);
+    const { runtime: testRuntime } = adapterRuntime(testClient);
+
+    await expect(testRuntime.estimateTransferGas({
+      from: agentAddress,
+      to: payTo,
+      amount: 10_000n,
+    })).rejects.toBeInstanceOf(MainnetPreflightError);
   });
 });

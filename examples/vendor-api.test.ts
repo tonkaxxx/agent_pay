@@ -34,7 +34,7 @@ test.each([
 });
 
 test("refuses mainnet Vendor startup without exact opt-in", () => {
-  expect(() => vendorRuntimeConfiguration(["--mainnet"], {
+  expect(() => vendorRuntimeConfiguration("mainnet", {
     BASE_MAINNET_RPC_URL: "https://mainnet.base.org",
     VENDOR_WALLET_ADDRESS: "0x1111111111111111111111111111111111111111",
     PORT: "3000",
@@ -56,7 +56,7 @@ test("starts the mainnet Vendor server only on loopback and prints real-funds wa
     },
   };
 
-  startVendorApp(vendorRuntimeConfiguration(["--mainnet"], {
+  startVendorApp(vendorRuntimeConfiguration("mainnet", {
     ALLOW_MAINNET_PAYMENTS: "true",
     BASE_MAINNET_RPC_URL: "https://mainnet.base.org",
     VENDOR_WALLET_ADDRESS: "0x1111111111111111111111111111111111111111",
@@ -86,7 +86,7 @@ test("starts the Sepolia Vendor server without a hostname", () => {
     },
   };
 
-  startVendorApp(vendorRuntimeConfiguration([], {
+  startVendorApp(vendorRuntimeConfiguration("sepolia", {
     BASE_SEPOLIA_RPC_URL: "https://sepolia.base.org",
     VENDOR_WALLET_ADDRESS: "0x1111111111111111111111111111111111111111",
     PORT: "3000",

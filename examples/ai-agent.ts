@@ -13,9 +13,9 @@ import {
   DEMO_PRICE_USDC,
   executeRequested,
   loadDemoEnvironment,
-  modeFromArguments,
   validatedPrivateKey,
   vendorApiUrlFromEnvironment,
+  type DemoMode,
 } from "./demo-config.js";
 import {
   MainnetPreflightError,
@@ -36,11 +36,11 @@ const defaultAgentDemoDependencies: AgentDemoDependencies = {
 };
 
 export async function runAgentDemo(
+  mode: DemoMode,
   args: readonly string[],
   env: NodeJS.ProcessEnv | Readonly<Record<string, string | undefined>>,
   dependencies: AgentDemoDependencies = defaultAgentDemoDependencies,
 ): Promise<void> {
-  const mode = modeFromArguments(args);
   const environment = loadDemoEnvironment(mode, env);
   const privateKey = validatedPrivateKey(env.AGENT_PRIVATE_KEY);
   const vendorApiUrl = vendorApiUrlFromEnvironment(environment, env);
@@ -104,8 +104,16 @@ export async function runAgentDemo(
   dependencies.log(JSON.stringify(await response.json()));
 }
 
+export function runDefaultAgentDemo(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv | Readonly<Record<string, string | undefined>>,
+  dependencies: AgentDemoDependencies = defaultAgentDemoDependencies,
+): Promise<void> {
+  return runAgentDemo("sepolia", args, env, dependencies);
+}
+
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  void runAgentDemo(process.argv.slice(2), process.env).catch((error: unknown) => {
+  void runDefaultAgentDemo(process.argv.slice(2), process.env).catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : "Agent request failed.");
     process.exitCode = 1;
   });

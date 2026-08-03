@@ -6,7 +6,6 @@ import {
   assertMainnetAllowed,
   executeRequested,
   loadDemoEnvironment,
-  modeFromArguments,
   validatedPrivateKey,
   vendorApiUrlFromEnvironment,
 } from "./demo-config.js";
@@ -21,12 +20,6 @@ const commonEnvironment = {
 };
 
 describe("demo configuration", () => {
-  test("selects Sepolia unless the command explicitly contains --mainnet", () => {
-    expect(modeFromArguments([])).toBe("sepolia");
-    expect(modeFromArguments(["--mainnet"])).toBe("mainnet");
-    expect(modeFromArguments(["--chain-id=8453"])).toBe("sepolia");
-  });
-
   test("selects only the RPC variable belonging to the explicit mode", () => {
     expect(loadDemoEnvironment("sepolia", commonEnvironment).rpcUrl)
       .toBe("https://sepolia.base.org/");

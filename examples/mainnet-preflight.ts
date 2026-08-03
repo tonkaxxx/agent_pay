@@ -91,10 +91,12 @@ export async function authorizeMainnetPayment(
     "Could not estimate USDC transfer gas.",
     () => options.runtime.estimateTransferGas(transfer),
   );
+  assertPositiveEstimate(estimatedGas, "USDC transfer gas estimate");
   const upperFeePerGas = await readPreflightValue(
     "Could not estimate an upper fee per gas.",
     () => options.runtime.estimateUpperFeePerGas(),
   );
+  assertPositiveEstimate(upperFeePerGas, "upper fee per gas");
 
   const bufferedGasCost = estimatedGas * upperFeePerGas * GAS_BUFFER_MULTIPLIER;
   if (ethBalance < bufferedGasCost) {
@@ -103,11 +105,21 @@ export async function authorizeMainnetPayment(
     );
   }
 
-  options.log(`Agent balance: ${formatUnits(usdcBalance, 6)} USDC`);
-  options.log(`Agent gas balance: ${formatEther(ethBalance)} ETH`);
+  options.log("BASE MAINNET / REAL FUNDS");
+  options.log(`Agent address: ${options.agentAddress}`);
+  options.log(`Vendor URL: ${options.context.requestUrl}`);
+  options.log(`Chain ID: ${options.context.chainId}`);
+  options.log(`Recipient: ${options.context.payTo}`);
+  options.log(`USDC token: ${options.context.token}`);
+  options.log(`Price: ${DEMO_PRICE_USDC} USDC (${DEMO_AMOUNT_USDC} base units)`);
+  options.log(`USDC balance: ${formatUnits(usdcBalance, 6)} USDC`);
+  options.log(`ETH balance: ${formatEther(ethBalance)} ETH`);
+  options.log(`Gas estimate: ${estimatedGas} gas`);
+  options.log(`Upper fee per gas: ${upperFeePerGas} wei`);
+  options.log(`Buffered gas cost: ${bufferedGasCost} wei`);
 
   if (!options.executeRequested) {
-    options.log("PAYMENT NOT SENT: preview mode; pass --execute to authorize the transfer.");
+    options.log("PAYMENT NOT SENT");
     return false;
   }
   if (!options.mainnetAllowed) {
@@ -116,6 +128,9 @@ export async function authorizeMainnetPayment(
     );
   }
 
+  options.log(`Chain ID: ${options.context.chainId}`);
+  options.log(`Recipient: ${options.context.payTo}`);
+  options.log(`Amount: ${DEMO_PRICE_USDC} USDC (${DEMO_AMOUNT_USDC} base units)`);
   return true;
 }
 
@@ -142,24 +157,36 @@ export function createMainnetPreflightRuntime(
         args: [to, amount],
       });
     },
-    estimateTransferGas: ({ from, to, amount }) => publicClient.estimateContractGas({
-      account: from,
-      address: USDC_BASE,
-      abi: usdcAbi,
-      functionName: "transfer",
-      args: [to, amount],
-    }),
+    estimateTransferGas: async ({ from, to, amount }) => {
+      const estimatedGas = await publicClient.estimateContractGas({
+        account: from,
+        address: USDC_BASE,
+        abi: usdcAbi,
+        functionName: "transfer",
+        args: [to, amount],
+      });
+      assertPositiveEstimate(estimatedGas, "RPC USDC transfer gas estimate");
+      return estimatedGas;
+    },
     estimateUpperFeePerGas: async () => {
       const fees = await publicClient.estimateFeesPerGas();
       if ("maxFeePerGas" in fees && fees.maxFeePerGas !== undefined) {
+        assertPositiveEstimate(fees.maxFeePerGas, "RPC max fee per gas");
         return fees.maxFeePerGas;
       }
       if ("gasPrice" in fees && fees.gasPrice !== undefined) {
+        assertPositiveEstimate(fees.gasPrice, "RPC gas price");
         return fees.gasPrice;
       }
       throw new MainnetPreflightError("RPC returned no usable upper fee per gas.");
     },
   };
+}
+
+function assertPositiveEstimate(value: bigint, label: string): void {
+  if (value <= 0n) {
+    throw new MainnetPreflightError(`${label} must be positive.`);
+  }
 }
 
 function validateStaticPayment(options: MainnetPreflightOptions): void {

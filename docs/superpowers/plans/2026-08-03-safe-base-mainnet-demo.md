@@ -4,7 +4,7 @@
 
 **Goal:** Add a fail-closed Base Mainnet demo that previews an exact `0.01 USDC` payment by default and can transfer real funds only after a verified preflight, the mainnet command, `--execute`, and `ALLOW_MAINNET_PAYMENTS=true`.
 
-**Architecture:** Keep Base Sepolia as the immutable default command path and add explicit mainnet package scripts over shared demo configuration. Extend `@x402/client` with pre-transfer authorization and post-submission observability hooks, then use a read-only, dependency-injected mainnet preflight policy to validate the same HTTP 402 requirement that would be paid.
+**Architecture:** Keep Base Sepolia as the immutable default command path and route explicit mainnet package scripts through thin network-specific entrypoint files over shared demo logic. Default entrypoints hardcode Sepolia and expose no CLI/environment network switch; dedicated mainnet entrypoints hardcode Mainnet. Extend `@x402/client` with pre-transfer authorization and post-submission observability hooks, then use a read-only, dependency-injected mainnet preflight policy to validate the same HTTP 402 requirement that would be paid.
 
 **Tech Stack:** Node.js 20+, TypeScript ESM/NodeNext, pnpm 11.18.0, viem 2.55.10, Express 5, Vitest 4, Supertest 7.
 
@@ -12,7 +12,7 @@
 
 - Never run a real or testnet transaction while implementing or verifying this plan.
 - Never run `pnpm demo:agent:mainnet -- --execute` against a real RPC.
-- Base Sepolia remains the behavior of `pnpm demo:vendor` and `pnpm demo:agent` regardless of environment values.
+- Base Sepolia remains the behavior of `pnpm demo:vendor` and `pnpm demo:agent` regardless of forwarded flags or environment values.
 - Base Mainnet is selected only by the dedicated package scripts and uses chain ID `8453`.
 - Mainnet price and client cap are both exactly `0.01 USDC` (`10_000n` units).
 - Mainnet payment requires all of: mainnet script, successful preflight, `--execute`, and `ALLOW_MAINNET_PAYMENTS=true`.
@@ -30,13 +30,15 @@
 - Modify `packages/client/src/agentFetch.ts`: authorization context, policy hook, transaction-submitted hook, typed error code, invocation order.
 - Modify `packages/client/src/index.ts`: export new public types.
 - Modify `packages/client/test/agentFetch.test.ts`: policy and lifecycle regression coverage.
-- Create `examples/demo-config.ts`: static network registry, CLI-mode selection, env validation, exact mainnet URL validation.
+- Create `examples/demo-config.ts`: static network registry, explicit-mode config, env validation, exact mainnet URL validation.
 - Create `examples/demo-config.test.ts`: deterministic configuration tests.
 - Modify `examples/vendor-api.ts`: network-aware app creation, mainnet opt-in, loopback binding, warnings.
+- Create `examples/vendor-api-mainnet.ts`: thin dedicated Mainnet Vendor entrypoint.
 - Modify `examples/vendor-api.test.ts`: Base Sepolia and Base Mainnet payload coverage.
 - Create `examples/mainnet-preflight.ts`: domain-level read-only runtime and fail-closed authorization policy.
 - Create `examples/mainnet-preflight.test.ts`: mocked balance, simulation, fee, and approval tests.
 - Modify `examples/ai-agent.ts`: testable entry point, mainnet preview/execute orchestration, hash output.
+- Create `examples/ai-agent-mainnet.ts`: thin dedicated Mainnet Agent entrypoint.
 - Create `examples/ai-agent.test.ts`: command-mode and preview behavior tests.
 - Modify `package.json`: dedicated mainnet scripts.
 - Modify `.env.example`: mainnet RPC, exact opt-in, IPv4 loopback URL.
@@ -328,7 +330,7 @@ git commit -m "feat(client): authorize and observe payments"
 
 **Interfaces:**
 - Consumes: `getUsdcAddress` and `SupportedChainId` from `@x402/server`.
-- Produces: `DemoMode`, `DemoNetwork`, `DemoEnvironment`, `DEMO_PRICE_USDC`, `DEMO_NETWORKS`, `modeFromArguments`, `executeRequested`, `loadDemoEnvironment`, `vendorApiUrlFromEnvironment`, `assertMainnetAllowed`, and `validatedPrivateKey`.
+- Produces: `DemoMode`, `DemoNetwork`, `DemoEnvironment`, `DEMO_PRICE_USDC`, `DEMO_NETWORKS`, `executeRequested`, `loadDemoEnvironment`, `vendorApiUrlFromEnvironment`, `assertMainnetAllowed`, and `validatedPrivateKey`.
 
 - [ ] **Step 1: Write failing configuration tests**
 
@@ -341,7 +343,6 @@ import {
   assertMainnetAllowed,
   executeRequested,
   loadDemoEnvironment,
-  modeFromArguments,
   validatedPrivateKey,
   vendorApiUrlFromEnvironment,
 } from "./demo-config.js";
@@ -356,12 +357,6 @@ const commonEnvironment = {
 };
 
 describe("demo configuration", () => {
-  test("selects Sepolia unless the command explicitly contains --mainnet", () => {
-    expect(modeFromArguments([])).toBe("sepolia");
-    expect(modeFromArguments(["--mainnet"])).toBe("mainnet");
-    expect(modeFromArguments(["--chain-id=8453"])).toBe("sepolia");
-  });
-
   test("selects only the RPC variable belonging to the explicit mode", () => {
     expect(loadDemoEnvironment("sepolia", commonEnvironment).rpcUrl)
       .toBe("https://sepolia.base.org/");
@@ -493,13 +488,10 @@ export const DEMO_NETWORKS: Readonly<Record<DemoMode, DemoNetwork>> = {
 };
 ```
 
-Implement deterministic argument parsing:
+Keep only exact execute-flag parsing; network mode is supplied by the
+network-specific entrypoint and is never parsed from forwarded arguments:
 
 ```ts
-export function modeFromArguments(args: readonly string[]): DemoMode {
-  return args.includes("--mainnet") ? "mainnet" : "sepolia";
-}
-
 export function executeRequested(args: readonly string[]): boolean {
   return args.includes("--execute");
 }
@@ -589,8 +581,8 @@ git commit -m "feat(demo): validate explicit network configuration"
 - Modify: `examples/vendor-api.test.ts:1-20`
 
 **Interfaces:**
-- Consumes: `DemoNetwork`, `DEMO_NETWORKS`, `DEMO_PRICE_USDC`, `modeFromArguments`, `loadDemoEnvironment`, and `assertMainnetAllowed` from Task 2.
-- Produces: `createVendorApp({ vendorWalletAddress, rpcUrl, network })`, pure `vendorRuntimeConfiguration(args, env)`, and mainnet startup behavior bound to `127.0.0.1`.
+- Consumes: `DemoMode`, `DemoNetwork`, `DEMO_NETWORKS`, `DEMO_PRICE_USDC`, `loadDemoEnvironment`, and `assertMainnetAllowed` from Task 2.
+- Produces: `createVendorApp({ vendorWalletAddress, rpcUrl, network })`, pure `vendorRuntimeConfiguration(mode, env)`, a Sepolia-hardcoded default entrypoint, and a thin Mainnet entrypoint bound to `127.0.0.1`.
 
 - [ ] **Step 1: Replace the example test with failing dual-network expectations**
 
@@ -623,7 +615,7 @@ test.each([
 });
 
 test("refuses mainnet Vendor startup without exact opt-in", () => {
-  expect(() => vendorRuntimeConfiguration(["--mainnet"], {
+  expect(() => vendorRuntimeConfiguration("mainnet", {
     BASE_MAINNET_RPC_URL: "https://mainnet.base.org",
     VENDOR_WALLET_ADDRESS: "0x1111111111111111111111111111111111111111",
     PORT: "3000",
@@ -673,17 +665,18 @@ pure configuration boundary used by both tests and the direct entry point:
 
 ```ts
 export function vendorRuntimeConfiguration(
-  args: readonly string[],
+  mode: DemoMode,
   env: NodeJS.ProcessEnv | Readonly<Record<string, string | undefined>>,
 ): DemoEnvironment {
-  const config = loadDemoEnvironment(modeFromArguments(args), env);
+  const config = loadDemoEnvironment(mode, env);
   if (config.network.realFunds) assertMainnetAllowed(env);
   return config;
 }
 ```
 
-The direct entry point calls this function with `process.argv.slice(2)` and
-`process.env`. Bind using:
+The default entrypoint calls this function with literal `"sepolia"`; forwarded
+arguments cannot change it. `examples/vendor-api-mainnet.ts` is a thin launcher
+that calls it with literal `"mainnet"`. Bind Mainnet using:
 
 ```ts
 if (config.network.realFunds) {
@@ -974,7 +967,7 @@ git commit -m "feat(demo): add read-only mainnet preflight"
 
 **Interfaces:**
 - Consumes: client hooks from Task 1; `loadDemoEnvironment`, `vendorApiUrlFromEnvironment`, and `validatedPrivateKey` from Task 2; preflight policy/runtime from Task 4.
-- Produces: exported `runAgentDemo(args, env, dependencies)`, `demo:vendor:mainnet`, and `demo:agent:mainnet` scripts.
+- Produces: exported `runAgentDemo(mode, args, env, dependencies)`, Sepolia-hardcoded default entrypoint, thin Mainnet entrypoint, `demo:vendor:mainnet`, and `demo:agent:mainnet` scripts.
 
 - [ ] **Step 1: Write failing tests for testnet compatibility and mainnet preview**
 
@@ -989,6 +982,7 @@ export interface AgentDemoDependencies {
 }
 
 export async function runAgentDemo(
+  mode: DemoMode,
   args: readonly string[],
   env: NodeJS.ProcessEnv | Readonly<Record<string, string | undefined>>,
   dependencies: AgentDemoDependencies = defaultAgentDemoDependencies,
@@ -1083,7 +1077,7 @@ Assert:
 ```ts
 test("keeps the default command on Sepolia without a payment policy", async () => {
   const { dependencies, createAgentFetch } = dependenciesForAgent();
-  await runAgentDemo([], sepoliaEnvironment, dependencies);
+  await runAgentDemo("sepolia", [], sepoliaEnvironment, dependencies);
   expect(createAgentFetch).toHaveBeenCalledWith(expect.objectContaining({
     rpcUrl: "https://sepolia.base.org/",
     maxPaymentUsdc: "0.10",
@@ -1095,7 +1089,7 @@ test("keeps the default command on Sepolia without a payment policy", async () =
 
 test("treats a successful mainnet preflight without execute as a no-payment success", async () => {
   const { dependencies, log, transferReached } = dependenciesForAgent();
-  await expect(runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies))
+  await expect(runAgentDemo("mainnet", [], mainnetEnvironment, dependencies))
     .resolves.toBeUndefined();
   expect(log).toHaveBeenCalledWith(expect.stringContaining("PAYMENT NOT SENT"));
   expect(transferReached).not.toHaveBeenCalled();
@@ -1103,7 +1097,7 @@ test("treats a successful mainnet preflight without execute as a no-payment succ
 
 test("passes redirect:error for a mainnet request", async () => {
   const { dependencies, agentFetch } = dependenciesForAgent();
-  await runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies);
+  await runAgentDemo("mainnet", [], mainnetEnvironment, dependencies);
   expect(agentFetch).toHaveBeenCalledWith(
     "http://127.0.0.1:3000/api/data",
     { redirect: "error" },
@@ -1117,14 +1111,14 @@ Add exact execute-gate and observability tests:
 test("rejects execute without environment opt-in before transfer", async () => {
   const { ALLOW_MAINNET_PAYMENTS: _removed, ...withoutOptIn } = mainnetEnvironment;
   const { dependencies, transferReached } = dependenciesForAgent();
-  await expect(runAgentDemo(["--mainnet", "--execute"], withoutOptIn, dependencies))
+  await expect(runAgentDemo("mainnet", ["--execute"], withoutOptIn, dependencies))
     .rejects.toThrow(/ALLOW_MAINNET_PAYMENTS/);
   expect(transferReached).not.toHaveBeenCalled();
 });
 
 test("prints submitted hash and explorer without printing the key", async () => {
   const { dependencies, createAgentFetch, log } = dependenciesForAgent();
-  await runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies);
+  await runAgentDemo("mainnet", [], mainnetEnvironment, dependencies);
   const config = createAgentFetch.mock.calls[0]![0];
   await config.onTransactionSubmitted?.({
     hash,
@@ -1148,13 +1142,15 @@ pnpm exec vitest run examples/ai-agent.test.ts
 
 Expected: FAIL because `runAgentDemo` and dependency injection do not exist.
 
-- [ ] **Step 3: Refactor `ai-agent.ts` into a testable entry point**
+- [ ] **Step 3: Refactor `ai-agent.ts` into shared logic and a Sepolia entrypoint**
 
-Export `runAgentDemo` and add the same direct-entry guard used by Vendor API:
+Export `runAgentDemo(mode, args, env, dependencies)` and have the default
+direct-entry guard pass literal `"sepolia"`. Add `examples/ai-agent-mainnet.ts`
+as a thin launcher that passes literal `"mainnet"`:
 
 ```ts
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  void runAgentDemo(process.argv.slice(2), process.env).catch((error: unknown) => {
+  void runAgentDemo("sepolia", process.argv.slice(2), process.env).catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : "Agent request failed.");
     process.exitCode = 1;
   });
@@ -1187,8 +1183,8 @@ Modify the scripts exactly as follows:
 ```json
 "demo:vendor": "tsx examples/vendor-api.ts",
 "demo:agent": "tsx examples/ai-agent.ts",
-"demo:vendor:mainnet": "tsx examples/vendor-api.ts --mainnet",
-"demo:agent:mainnet": "tsx examples/ai-agent.ts --mainnet"
+"demo:vendor:mainnet": "tsx examples/vendor-api-mainnet.ts",
+"demo:agent:mainnet": "tsx examples/ai-agent-mainnet.ts"
 ```
 
 The actual command remains:

@@ -9,8 +9,8 @@ import {
   DEMO_PRICE_USDC,
   assertMainnetAllowed,
   loadDemoEnvironment,
-  modeFromArguments,
   type DemoEnvironment,
+  type DemoMode,
   type DemoNetwork,
 } from "./demo-config.js";
 
@@ -45,12 +45,19 @@ export function createVendorApp(config: {
 }
 
 export function vendorRuntimeConfiguration(
-  args: readonly string[],
+  mode: DemoMode,
   env: NodeJS.ProcessEnv | Readonly<Record<string, string | undefined>>,
 ): DemoEnvironment {
-  const config = loadDemoEnvironment(modeFromArguments(args), env);
+  const config = loadDemoEnvironment(mode, env);
   if (config.network.realFunds) assertMainnetAllowed(env);
   return config;
+}
+
+export function defaultVendorRuntimeConfiguration(
+  _args: readonly string[],
+  env: NodeJS.ProcessEnv | Readonly<Record<string, string | undefined>>,
+): DemoEnvironment {
+  return vendorRuntimeConfiguration("sepolia", env);
 }
 
 export function startVendorApp(
@@ -79,7 +86,7 @@ export function startVendorApp(
 }
 
 function main(): void {
-  const config = vendorRuntimeConfiguration(process.argv.slice(2), process.env);
+  const config = defaultVendorRuntimeConfiguration(process.argv.slice(2), process.env);
   startVendorApp(config, createVendorApp(config), console.log);
 }
 

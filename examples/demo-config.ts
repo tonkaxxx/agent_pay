@@ -47,10 +47,6 @@ export interface DemoEnvironment {
 
 type Environment = NodeJS.ProcessEnv | Readonly<Record<string, string | undefined>>;
 
-export function modeFromArguments(args: readonly string[]): DemoMode {
-  return args.includes("--mainnet") ? "mainnet" : "sepolia";
-}
-
 export function executeRequested(args: readonly string[]): boolean {
   return args.includes("--execute");
 }

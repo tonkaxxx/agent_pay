@@ -58,9 +58,9 @@ mainnet command:
 
 - Replace the `.env.example` placeholder recipient and private key; do not
   fund the placeholders.
-- Fund the agent's dedicated wallet with official Base USDC and enough Base ETH
-  for gas. The vendor needs only a controlled recipient address to receive the
-  payment.
+- Fund the agent's dedicated low-balance mainnet wallet with official Base USDC
+  and enough Base ETH for gas. The vendor needs only a controlled recipient
+  address to receive the payment.
 - Set `BASE_MAINNET_RPC_URL` to a Base Mainnet RPC URL,
   `VENDOR_API_URL=http://127.0.0.1:3000/api/data`, and
   `ALLOW_MAINNET_PAYMENTS=true` in `.env`.
@@ -169,7 +169,7 @@ pnpm build
 ## Security notes
 
 - Base mainnet uses real funds. Test on Base Sepolia first, review all contract
-  addresses, and use a dedicated low-balance agent wallet in production.
+  addresses, and use a dedicated low-balance mainnet wallet.
 - The demo client's default payment cap is `$0.10`; set a cap appropriate for
   each agent and service instead of trusting a vendor-provided price.
 - This SDK does not decide which vendor origins an agent may call. Apply an

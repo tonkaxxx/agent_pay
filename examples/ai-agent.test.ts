@@ -105,7 +105,7 @@ function dependenciesForAgent(options: {
 describe("runAgentDemo", () => {
   test("keeps the default command on Sepolia without a payment policy", async () => {
     const { dependencies, createAgentFetch } = dependenciesForAgent();
-    await runAgentDemo([], sepoliaEnvironment, dependencies);
+    await runAgentDemo("sepolia", [], sepoliaEnvironment, dependencies);
     expect(createAgentFetch).toHaveBeenCalledWith(expect.objectContaining({
       rpcUrl: "https://sepolia.base.org/",
       maxPaymentUsdc: "0.10",
@@ -117,7 +117,7 @@ describe("runAgentDemo", () => {
 
   test("treats a successful mainnet preflight without execute as a no-payment success", async () => {
     const { dependencies, log, transferReached } = dependenciesForAgent();
-    await expect(runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies))
+    await expect(runAgentDemo("mainnet", [], mainnetEnvironment, dependencies))
       .resolves.toBeUndefined();
     expect(log).toHaveBeenCalledWith(expect.stringContaining("PAYMENT NOT SENT"));
     expect(transferReached).not.toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe("runAgentDemo", () => {
   test("authorizes exact mainnet execute and reaches transfer", async () => {
     const { dependencies, transferReached } = dependenciesForAgent();
 
-    await runAgentDemo(["--mainnet", "--execute"], mainnetEnvironment, dependencies);
+    await runAgentDemo("mainnet", ["--execute"], mainnetEnvironment, dependencies);
 
     expect(transferReached).toHaveBeenCalledOnce();
   });
@@ -134,14 +134,14 @@ describe("runAgentDemo", () => {
   test("uses the exact one-cent payment cap for mainnet", async () => {
     const { dependencies, createAgentFetch } = dependenciesForAgent();
 
-    await runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies);
+    await runAgentDemo("mainnet", [], mainnetEnvironment, dependencies);
 
     expect(createAgentFetch.mock.calls[0]![0].maxPaymentUsdc).toBe("0.01");
   });
 
   test("passes redirect:error for a mainnet request", async () => {
     const { dependencies, agentFetch } = dependenciesForAgent();
-    await runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies);
+    await runAgentDemo("mainnet", [], mainnetEnvironment, dependencies);
     expect(agentFetch).toHaveBeenCalledWith(
       "http://127.0.0.1:3000/api/data",
       { redirect: "error" },
@@ -151,7 +151,7 @@ describe("runAgentDemo", () => {
   test("rejects execute without environment opt-in before transfer", async () => {
     const { ALLOW_MAINNET_PAYMENTS: _removed, ...withoutOptIn } = mainnetEnvironment;
     const { dependencies, transferReached } = dependenciesForAgent();
-    await expect(runAgentDemo(["--mainnet", "--execute"], withoutOptIn, dependencies))
+    await expect(runAgentDemo("mainnet", ["--execute"], withoutOptIn, dependencies))
       .rejects.toThrow(/ALLOW_MAINNET_PAYMENTS/);
     expect(transferReached).not.toHaveBeenCalled();
   });
@@ -161,7 +161,7 @@ describe("runAgentDemo", () => {
       runtime: mainnetRuntime({ getChainId: vi.fn().mockResolvedValue(84532) }),
     });
 
-    await expect(runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies))
+    await expect(runAgentDemo("mainnet", [], mainnetEnvironment, dependencies))
       .rejects.toBeInstanceOf(MainnetPreflightError);
     expect(transferReached).not.toHaveBeenCalled();
   });
@@ -178,7 +178,7 @@ describe("runAgentDemo", () => {
   ] as const)("propagates %s failure", async (_label, requestError) => {
     const { dependencies } = dependenciesForAgent({ requestError });
 
-    await expect(runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies))
+    await expect(runAgentDemo("mainnet", [], mainnetEnvironment, dependencies))
       .rejects.toBe(requestError);
   });
 
@@ -186,7 +186,7 @@ describe("runAgentDemo", () => {
     const denialCause = new Error("unrelated authorization failure");
     const { dependencies } = dependenciesForAgent({ denialCause });
 
-    await expect(runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies))
+    await expect(runAgentDemo("mainnet", [], mainnetEnvironment, dependencies))
       .rejects.toMatchObject({
         code: "payment_not_authorized",
         cause: denialCause,
@@ -195,7 +195,7 @@ describe("runAgentDemo", () => {
 
   test("prints submitted hash and explorer without printing the key", async () => {
     const { dependencies, createAgentFetch, log } = dependenciesForAgent();
-    await runAgentDemo(["--mainnet"], mainnetEnvironment, dependencies);
+    await runAgentDemo("mainnet", [], mainnetEnvironment, dependencies);
     const config = createAgentFetch.mock.calls[0]![0];
     await config.onTransactionSubmitted?.({
       hash,

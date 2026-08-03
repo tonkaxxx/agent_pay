@@ -11,8 +11,8 @@
     "test": "vitest run",
     "demo:vendor": "tsx examples/vendor-api.ts",
     "demo:agent": "tsx examples/ai-agent.ts",
-    "demo:vendor:mainnet": "tsx examples/vendor-api.ts --mainnet",
-    "demo:agent:mainnet": "tsx examples/ai-agent.ts --mainnet"
+    "demo:vendor:mainnet": "tsx examples/vendor-api-mainnet.ts",
+    "demo:agent:mainnet": "tsx examples/ai-agent-mainnet.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
