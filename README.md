@@ -3,8 +3,9 @@
 `@x402/server` turns a paid Express route into a small HTTP 402 protocol
 endpoint. `@x402/client` turns `fetch` into an agent client that reads the 402
 requirements, sends USDC, waits for one confirmation, and retries with the
-transaction hash. The included demo is deliberately fixed to Base Sepolia and
-a $0.01 USDC price.
+transaction hash. The default no-suffix demo commands (`pnpm demo:vendor` and
+`pnpm demo:agent`) are deliberately fixed to Base Sepolia and a $0.01 USDC
+price.
 
 ## Requirements
 
