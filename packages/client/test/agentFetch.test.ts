@@ -174,4 +174,104 @@ describe("createAgentFetch", () => {
     expect(runtime.transferUsdc).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+
+  test("does not create a payment runtime when authorization rejects", async () => {
+    const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
+    const authorizePayment = vi.fn().mockReturnValue(false);
+    fetch.mockResolvedValueOnce(paymentRequired(validPaymentRequirement()));
+    const agentFetch = createAgentFetch({ privateKey, rpcUrl, authorizePayment }, dependencies);
+
+    await expect(agentFetch("https://vendor.example/data")).rejects.toMatchObject({
+      name: "X402ProtocolError",
+      code: "payment_not_authorized",
+    });
+    expect(authorizePayment).toHaveBeenCalledOnce();
+    expect(createPaymentRuntime).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ["throws", vi.fn(() => { throw new Error("policy unavailable"); })],
+    ["rejects", vi.fn().mockRejectedValue(new Error("policy unavailable"))],
+  ])("does not create a payment runtime when authorization %s", async (_name, authorizePayment) => {
+    const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
+    fetch.mockResolvedValueOnce(paymentRequired(validPaymentRequirement()));
+    const agentFetch = createAgentFetch({ privateKey, rpcUrl, authorizePayment }, dependencies);
+
+    await expect(agentFetch("https://vendor.example/data")).rejects.toMatchObject({
+      name: "X402ProtocolError",
+      code: "payment_not_authorized",
+      cause: expect.any(Error),
+    });
+    expect(createPaymentRuntime).not.toHaveBeenCalled();
+  });
+
+  test("authorizes the normalized requirement before constructing the runtime", async () => {
+    const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
+    const runtime = paymentRuntime();
+    const authorizePayment = vi.fn().mockReturnValue(true);
+    createPaymentRuntime.mockReturnValue(runtime);
+    fetch
+      .mockResolvedValueOnce(paymentRequired(validPaymentRequirement()))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    const agentFetch = createAgentFetch({ privateKey, rpcUrl, authorizePayment }, dependencies);
+    await agentFetch("https://vendor.example/data");
+
+    expect(authorizePayment).toHaveBeenCalledWith({
+      requestUrl: "https://vendor.example/data",
+      chainId: 84532,
+      network: "base-sepolia",
+      payTo,
+      token: USDC_BASE_SEPOLIA,
+      priceUsdc: "0.01",
+      amount: 10_000n,
+    });
+    expect(authorizePayment.mock.invocationCallOrder[0]).toBeLessThan(
+      createPaymentRuntime.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  test("reports the transaction hash before waiting for its receipt", async () => {
+    const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
+    const runtime = paymentRuntime();
+    const onTransactionSubmitted = vi.fn();
+    createPaymentRuntime.mockReturnValue(runtime);
+    fetch
+      .mockResolvedValueOnce(paymentRequired(validPaymentRequirement()))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    await createAgentFetch({ privateKey, rpcUrl, onTransactionSubmitted }, dependencies)(
+      "https://vendor.example/data",
+    );
+
+    expect(onTransactionSubmitted).toHaveBeenCalledWith(expect.objectContaining({
+      hash,
+      chainId: 84532,
+      token: USDC_BASE_SEPOLIA,
+      payTo,
+      amount: 10_000n,
+    }));
+    expect(onTransactionSubmitted.mock.invocationCallOrder[0]).toBeLessThan(
+      (runtime.waitForReceipt as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!,
+    );
+  });
+
+  test("continues confirmation and retry when transaction notification throws", async () => {
+    const { dependencies, fetch, createPaymentRuntime } = dependenciesFor();
+    const runtime = paymentRuntime();
+    createPaymentRuntime.mockReturnValue(runtime);
+    fetch
+      .mockResolvedValueOnce(paymentRequired(validPaymentRequirement()))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    const response = await createAgentFetch({
+      privateKey,
+      rpcUrl,
+      onTransactionSubmitted: () => { throw new Error("observer failed"); },
+    }, dependencies)("https://vendor.example/data");
+
+    expect(response.status).toBe(200);
+    expect(runtime.waitForReceipt).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
 });

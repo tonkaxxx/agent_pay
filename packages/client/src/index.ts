@@ -10,6 +10,10 @@ export type {
   AgentFetchConfig,
   AgentFetchDependencies,
   PaymentErrorCode,
+  PaymentAuthorizationContext,
+  PaymentChainId,
+  PaymentNetwork,
   PaymentRuntime,
+  PaymentTransactionContext,
   ProtocolErrorCode,
 } from "./agentFetch.js";
