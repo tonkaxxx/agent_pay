@@ -1,13 +1,22 @@
 import { readFileSync } from "node:fs";
 
-import type { AgentFetch, AgentFetchConfig } from "@x402/client";
+import type { Address, Hash, Hex } from "viem";
+import {
+  createAgentFetch,
+  USDC_BASE_SEPOLIA,
+  type AgentFetch,
+  type AgentFetchConfig,
+  type PaymentChainId,
+  type PaymentRuntime,
+} from "@x402/client";
 import { expect, test, vi } from "vitest";
 
 import type { AgentDemoDependencies } from "./ai-agent.js";
 import type { MainnetPreflightRuntime } from "./mainnet-preflight.js";
 
-const payTo = "0x1111111111111111111111111111111111111111";
-const testPrivateKey = `0x${"11".repeat(32)}`;
+const payTo = "0x1111111111111111111111111111111111111111" as Address;
+const hash = `0x${"ab".repeat(32)}` as Hash;
+const testPrivateKey = `0x${"11".repeat(32)}` as Hex;
 const environment = {
   BASE_SEPOLIA_RPC_URL: "https://sepolia.base.org",
   BASE_MAINNET_RPC_URL: "https://mainnet.base.org",
@@ -18,6 +27,58 @@ const environment = {
   VENDOR_API_URL: "http://127.0.0.1:3000/api/data",
   PORT: "3000",
 };
+
+function paymentRequired(chainId: PaymentChainId, priceUsdc: string): Response {
+  return new Response(JSON.stringify({
+    error: "Payment Required",
+    priceUsdc,
+    payTo,
+    network: chainId === 8453 ? "base" : "base-sepolia",
+    chainId,
+  }), {
+    status: 402,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function defaultAgentOrchestration(chainId: PaymentChainId, priceUsdc: string) {
+  const fetch = vi.fn<typeof globalThis.fetch>();
+  fetch
+    .mockResolvedValueOnce(paymentRequired(chainId, priceUsdc))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ data: "paid" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+  const transferUsdc = vi.fn().mockResolvedValue(hash);
+  const runtime: PaymentRuntime = {
+    getChainId: vi.fn().mockResolvedValue(chainId),
+    transferUsdc,
+    waitForReceipt: vi.fn().mockResolvedValue({ status: "success" }),
+  };
+  const createPaymentRuntime = vi.fn(() => runtime);
+  const createAgentFetchWithMockedBoundaries: typeof createAgentFetch = (config) =>
+    createAgentFetch(config, { fetch, createPaymentRuntime });
+  const createMainnetPreflightRuntime = vi.fn((): MainnetPreflightRuntime => ({
+    getChainId: vi.fn().mockResolvedValue(8453),
+    getEthBalance: vi.fn().mockResolvedValue(1_000_000_000_000_000n),
+    getUsdcBalance: vi.fn().mockResolvedValue(2_000_000n),
+    simulateTransfer: vi.fn().mockResolvedValue(undefined),
+    estimateTransferGas: vi.fn().mockResolvedValue(60_000n),
+    estimateUpperFeePerGas: vi.fn().mockResolvedValue(1_000_000n),
+  }));
+  const dependencies: AgentDemoDependencies = {
+    createAgentFetch: createAgentFetchWithMockedBoundaries,
+    createMainnetPreflightRuntime,
+    log: vi.fn(),
+  };
+  return {
+    dependencies,
+    fetch,
+    createPaymentRuntime,
+    createMainnetPreflightRuntime,
+    transferUsdc,
+  };
+}
 
 function agentDependencies() {
   const agentFetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: "ok" }), {
@@ -53,10 +114,66 @@ test("default agent entrypoint stays on Sepolia under forwarded mainnet and exec
     maxPaymentUsdc: "0.10",
   }));
   const config = createAgentFetch.mock.calls[0]![0];
-  expect(config.authorizePayment).toBeUndefined();
+  expect(config.authorizePayment).toEqual(expect.any(Function));
   expect(config.onTransactionSubmitted).toBeUndefined();
   expect(createMainnetPreflightRuntime).not.toHaveBeenCalled();
   expect(agentFetch).toHaveBeenCalledWith("http://127.0.0.1:3000/api/data");
+});
+
+test("default agent rejects a valid Base Mainnet 402 before runtime construction", async () => {
+  const { runDefaultAgentDemo } = await import("./ai-agent.js");
+  const {
+    dependencies,
+    fetch,
+    createPaymentRuntime,
+    createMainnetPreflightRuntime,
+    transferUsdc,
+  } = defaultAgentOrchestration(8453, "0.01");
+  let error: unknown;
+
+  try {
+    await runDefaultAgentDemo(["--mainnet", "--execute"], {
+      ...environment,
+      BASE_SEPOLIA_RPC_URL: "https://mainnet.base.org",
+    }, dependencies);
+  } catch (caught) {
+    error = caught;
+  }
+
+  expect(createPaymentRuntime).not.toHaveBeenCalled();
+  expect(transferUsdc).not.toHaveBeenCalled();
+  expect(createMainnetPreflightRuntime).not.toHaveBeenCalled();
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(error).toMatchObject({
+    name: "X402ProtocolError",
+    code: "payment_not_authorized",
+  });
+});
+
+test("default agent pays a valid Base Sepolia 402 at its existing 0.10 cap", async () => {
+  const { runDefaultAgentDemo } = await import("./ai-agent.js");
+  const {
+    dependencies,
+    fetch,
+    createPaymentRuntime,
+    createMainnetPreflightRuntime,
+    transferUsdc,
+  } = defaultAgentOrchestration(84532, "0.10");
+
+  await runDefaultAgentDemo(["--mainnet", "--execute"], environment, dependencies);
+
+  expect(createPaymentRuntime).toHaveBeenCalledWith({
+    privateKey: testPrivateKey,
+    rpcUrl: "https://sepolia.base.org/",
+    chainId: 84532,
+  });
+  expect(transferUsdc).toHaveBeenCalledWith({
+    token: USDC_BASE_SEPOLIA,
+    to: payTo,
+    amount: 100_000n,
+  });
+  expect(createMainnetPreflightRuntime).not.toHaveBeenCalled();
+  expect(fetch).toHaveBeenCalledTimes(2);
 });
 
 test("default Vendor entrypoint stays on Sepolia under all forwarded flags and env values", async () => {

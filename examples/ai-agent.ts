@@ -5,6 +5,7 @@ import { privateKeyToAccount } from "viem/accounts";
 
 import {
   createAgentFetch,
+  USDC_BASE_SEPOLIA,
   X402ProtocolError,
   type AgentFetchConfig,
 } from "@x402/client";
@@ -50,6 +51,9 @@ export async function runAgentDemo(
     privateKey,
     rpcUrl: environment.rpcUrl,
     maxPaymentUsdc: "0.10",
+    authorizePayment: (context) => context.chainId === 84532
+      && context.network === "base-sepolia"
+      && context.token === USDC_BASE_SEPOLIA,
   };
 
   if (environment.network.realFunds) {

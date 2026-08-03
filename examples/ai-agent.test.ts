@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 
 import {
   USDC_BASE,
+  USDC_BASE_SEPOLIA,
   X402PaymentError,
   X402ProtocolError,
   type AgentFetch,
@@ -27,6 +28,15 @@ const context: PaymentAuthorizationContext = {
   token: USDC_BASE,
   priceUsdc: "0.01",
   amount: 10_000n,
+};
+const sepoliaContext: PaymentAuthorizationContext = {
+  requestUrl: "http://localhost:3000/api/data",
+  chainId: 84532,
+  network: "base-sepolia",
+  payTo,
+  token: USDC_BASE_SEPOLIA,
+  priceUsdc: "0.10",
+  amount: 100_000n,
 };
 
 function mainnetRuntime(
@@ -61,6 +71,7 @@ function dependenciesForAgent(options: {
   runtime?: MainnetPreflightRuntime;
   requestError?: Error;
   denialCause?: Error;
+  authorizationContext?: PaymentAuthorizationContext;
 } = {}) {
   const log = vi.fn();
   const transferReached = vi.fn();
@@ -71,7 +82,7 @@ function dependenciesForAgent(options: {
       if (config.authorizePayment !== undefined) {
         let authorized: boolean;
         try {
-          authorized = await config.authorizePayment(context);
+          authorized = await config.authorizePayment(options.authorizationContext ?? context);
         } catch (cause) {
           throw new X402ProtocolError(
             "payment_not_authorized",
@@ -103,15 +114,17 @@ function dependenciesForAgent(options: {
 }
 
 describe("runAgentDemo", () => {
-  test("keeps the default command on Sepolia without a payment policy", async () => {
-    const { dependencies, createAgentFetch } = dependenciesForAgent();
+  test("keeps the default command on Sepolia with an immutable payment policy", async () => {
+    const { dependencies, createAgentFetch } = dependenciesForAgent({
+      authorizationContext: sepoliaContext,
+    });
     await runAgentDemo("sepolia", [], sepoliaEnvironment, dependencies);
     expect(createAgentFetch).toHaveBeenCalledWith(expect.objectContaining({
       rpcUrl: "https://sepolia.base.org/",
       maxPaymentUsdc: "0.10",
     }));
     const config = createAgentFetch.mock.calls[0]![0];
-    expect(config.authorizePayment).toBeUndefined();
+    expect(config.authorizePayment).toEqual(expect.any(Function));
     expect(config.onTransactionSubmitted).toBeUndefined();
   });
 
