@@ -69,7 +69,7 @@ BASE_MAINNET_RPC_URL=https://mainnet.base.org
 ALLOW_MAINNET_PAYMENTS=false
 VENDOR_WALLET_ADDRESS=0x1111111111111111111111111111111111111111
 AGENT_PRIVATE_KEY=0x1111111111111111111111111111111111111111111111111111111111111111
-VENDOR_API_URL=http://localhost:3000/api/data
+VENDOR_API_URL=http://127.0.0.1:3000/api/data
 PORT=3000
 ```
 
@@ -96,8 +96,9 @@ PORT=3000
 | Mainnet | `base` | 8453 | `BASE_MAINNET_RPC_URL` | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
 
 Mainnet Vendor API слушает только `127.0.0.1`. Mainnet Agent принимает
-`VENDOR_API_URL` только с loopback hostname `localhost`, `127.0.0.1` или
-`[::1]`; URL должен использовать `http:` или `https:`. Запрос выполняется с
+`VENDOR_API_URL` только в точной локальной форме
+`http://127.0.0.1:<PORT>/api/data`: protocol, hostname, port и pathname должны
+совпасть, а credentials, query и fragment запрещены. Запрос выполняется с
 `redirect: "error"`, поэтому HTTP redirect не может изменить получателя
 платёжных требований.
 
@@ -162,9 +163,10 @@ Preflight проверяет:
 7. Публичный USDC balance агента не меньше `10_000` units.
 8. ETH balance агента положителен.
 9. RPC может симулировать `USDC.transfer(payTo, 10_000)` от адреса агента.
-10. RPC может оценить gas и fee; расчётная стоимость с защитным множителем
-    помещается в ETH balance. Оценка является preflight-проверкой, а не
-    гарантией будущей цены gas.
+10. RPC может оценить gas и верхнюю fee per gas. Требуемый запас рассчитывается
+    как `estimatedGas * upperFeePerGas * 2`; ETH balance должен быть не меньше
+    этой величины. Двукратный множитель является фиксированным запасом demo, а
+    оценка остаётся preflight-проверкой, не гарантией будущей цены gas.
 
 Вывод включает:
 
