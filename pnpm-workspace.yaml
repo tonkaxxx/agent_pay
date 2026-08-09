@@ -1,6 +1,9 @@
 packages:
   - "packages/*"
+  - "web"
 allowBuilds:
   esbuild: true
+  unrs-resolver: true
 minimumReleaseAgeExclude:
   - tsx@4.23.4
+  - lucide-react@1.31.0

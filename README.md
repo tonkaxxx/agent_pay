@@ -7,6 +7,51 @@ transaction hash. The default no-suffix demo commands (`pnpm demo:vendor` and
 `pnpm demo:agent`) are deliberately fixed to Base Sepolia and a $0.01 USDC
 price.
 
+## AgentPay investor website
+
+The deployable Next.js demonstration lives entirely in [`web/`](web/). It
+includes the investor landing page, developer documentation, and a real
+`GET /api/premium` endpoint priced at exactly `0.01` official USDC on Base
+Mainnet. The endpoint verifies two confirmations and uses Redis `SET NX` replay
+claims before it releases the premium response.
+
+To run the site locally:
+
+```sh
+cp web/.env.example web/.env.local
+# Replace AGENTPAY_PAY_TO and the service URLs with your deployment values.
+pnpm dev:web
+```
+
+The server requires `NEXT_PUBLIC_SITE_URL`, `AGENTPAY_PAY_TO`,
+`BASE_MAINNET_RPC_URL`, and `REDIS_URL`. Use durable, shared Redis in production
+so a transaction hash cannot be reused across instances or restarts. Do not set
+`AGENT_PRIVATE_KEY` on the web server; that value belongs only to the optional
+local client example.
+
+Without a payment header, the deployed route is safe to inspect:
+
+```sh
+curl -i https://your-domain.example/api/premium
+```
+
+It returns HTTP `402` with the exact amount, chain, and recipient. The website
+itself never connects a wallet or initiates a payment. The guarded CLI described
+at `/docs` previews the live quote by default; a real transfer additionally
+requires both `--execute` and `ALLOW_MAINNET_PAYMENTS=true`.
+
+The transaction hash is a public bearer receipt for a fixed, non-sensitive
+demonstration response. Do not use this route for secrets or user-specific
+entitlements unless the protocol is extended to bind a unique quote and an
+authenticated payer identity to each request.
+
+For a conventional Node deployment, build and run the app with:
+
+```sh
+pnpm build
+pnpm --dir web start
+```
+
 ## Requirements
 
 - Node.js 20 or later and [Corepack](https://nodejs.org/api/corepack.html)

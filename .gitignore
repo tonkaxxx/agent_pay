@@ -9,3 +9,5 @@ coverage/
 .DS_Store
 .vscode/
 docs/
+!web/src/app/docs/
+!web/src/app/docs/**
