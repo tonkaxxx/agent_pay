@@ -36,13 +36,13 @@ test("the actual API route publishes exact Base Mainnet requirements", async ({ 
   });
 });
 
-test("documents the guarded real-funds flow", async ({ page }) => {
+test("documents the 402 payment gate", async ({ page }) => {
   await page.goto("/docs");
 
   await expect(page).toHaveTitle(/Developer Docs/);
-  await expect(page.getByRole("heading", { level: 1, name: /ship your first paid request/i })).toBeVisible();
-  await expect(page.getByText("REAL FUNDS · BASE MAINNET")).toBeVisible();
-  await expect(page.getByText(/ALLOW_MAINNET_PAYMENTS=true/).last()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /add a 402 payment gate to any route/i })).toBeVisible();
+  await expect(page.getByText(/paymentMiddleware/)).toBeVisible();
+  await expect(page.getByRole("link", { name: /pay with your agent/i })).toBeVisible();
 
   const hasHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,

@@ -162,7 +162,7 @@ app.get(
     chainId: 84532,
     rpcUrl: process.env.BASE_SEPOLIA_RPC_URL!,
   }),
-  (_request, response) => response.json({ data: "The paid signal is 42." }),
+  (_request, response) => response.json({ data: "Here is your premium data" }),
 );
 ```
 

@@ -109,9 +109,6 @@ export function LandingPage() {
               </Link>
             </div>
           </div>
-          <div className="hero-signal" aria-hidden="true">
-            <span className="signal-dot" /> MAINNET READY
-          </div>
         </section>
 
         <section className="proof-strip" aria-label="Product proof points">

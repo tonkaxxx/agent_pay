@@ -1,83 +1,63 @@
 import {
   ArrowLeft,
   ArrowUpRight,
-  CircleAlert,
-  CircleCheck,
+  Bot,
+  CircleX,
   Code2,
-  KeyRound,
-  LockKeyhole,
+  Package,
   ServerCog,
   ShieldAlert,
-  TerminalSquare,
 } from "lucide-react";
 import Link from "next/link";
 
 import { CodeBlock } from "./code-block";
 
-const inspectCommand = `export AGENTPAY_API_URL=https://your-domain.example
-curl -i "$AGENTPAY_API_URL/api/premium"`;
+const installCommand = `pnpm add @x402/server`;
 
-const paymentRequired = `HTTP/2 402
-cache-control: no-store
+const middlewareExample = `import { paymentMiddleware } from "@x402/server";
+import express from "express";
+
+const app = express();
+
+app.get(
+  "/api/data",
+  paymentMiddleware({
+    priceUsdc: "0.01",                          // 1 US cent
+    payTo: "0x1111111111111111111111111111111111111111", // your wallet
+    chainId: 84532,                             // Base Sepolia
+    rpcUrl: process.env.BASE_SEPOLIA_RPC_URL!,
+  }),
+  (_request, response) => {
+    response.json({ data: "Here is your premium data" });
+  },
+);
+
+app.listen(3000);`;
+
+const paymentRequired = `HTTP/1.1 402 Payment Required
 content-type: application/json
 
 {
   "error": "Payment Required",
   "priceUsdc": "0.01",
-  "payTo": "0x...",
-  "network": "base",
-  "chainId": 8453
+  "payTo": "0x1111111111111111111111111111111111111111",
+  "network": "base-sepolia",
+  "chainId": 84532
 }`;
 
-const setupCommand = `git clone https://github.com/tonkaxxx/agent_pay.git
-cd agent_pay
-corepack pnpm install
-cp web/.env.example web/.env.local`;
+const paidRequest = `curl -i $'http://127.0.0.1:3000/api/data' \\
+  -H 'X-Payment-Tx: 0x<receipt-transaction-hash>'`;
 
-const environmentExample = `AGENT_PRIVATE_KEY=0x...              # replace; dedicated low-balance wallet
-BASE_MAINNET_RPC_URL=https://...   # must report chain 8453
-AGENTPAY_API_URL=https://.../api/premium
-AGENTPAY_EXPECTED_PAY_TO=0x...     # pin the published recipient
-ALLOW_MAINNET_PAYMENTS=false       # preview is the safe default`;
+const agentPrompt = `here is crypto wallet private key: 
+[INSERT_PRIVATE_KEY]
 
-const previewCommand = `pnpm --dir web demo:premium`;
-
-const executeCommand = `ALLOW_MAINNET_PAYMENTS=true \
-pnpm --dir web demo:premium -- --execute`;
-
-const clientExample = `const agentFetch = createAgentFetch({
-  privateKey,
-  rpcUrl,
-  maxPaymentUsdc: "0.01",
-  confirmations: 2,
-  paymentVerificationRetries: 5,
-  paymentVerificationRetryDelayMs: 2_000,
-  authorizePayment: (payment) =>
-    payment.requestUrl === apiUrl &&
-    payment.chainId === 8453 &&
-    payment.network === "base" &&
-    payment.token === USDC_BASE &&
-    payment.payTo === expectedPayTo &&
-    payment.amount === 10_000n,
-});
-
-const response = await agentFetch(apiUrl);`;
-
-const paidResponse = `HTTP/2 200
-cache-control: no-store
-
-{
-  "premiumData": "Here's your premium data — paid, verified, and unlocked by AgentPay.",
-  "paidWith": "USDC",
-  "network": "base",
-  "txHash": "0x..."
-}`;
+Fetch data from the following API endpoint: https://agentpay.thebestsites.ru/api/premium `;
 
 const statuses = [
-  ["200", "Paid", "Receipt verified and transaction hash claimed exactly once."],
-  ["402", "Payment required", "No X-Payment-Tx header; exact mainnet terms are returned."],
+  ["402", "Payment required", "No X-Payment-Tx header; exact price, chain, and recipient are returned."],
+  ["200", "Paid", "Receipt verified and the transaction hash is claimed exactly once."],
   ["403", "Invalid payment", "Malformed, failed, insufficient, or already-used transaction."],
-  ["503", "Retry safely", "Receipt, confirmations, RPC, Redis, or deployment config is unavailable."],
+  ["503", "Retry safely", "Receipt, confirmations, or RPC temporarily unavailable."],
 ] as const;
 
 export function DocsPage() {
@@ -98,94 +78,75 @@ export function DocsPage() {
           <Link href="/"><ArrowLeft aria-hidden="true" /> Back to overview</Link>
           <nav aria-label="Documentation sections">
             <a href="#quickstart">Quickstart</a>
-            <a href="#inspect">Inspect the 402</a>
-            <a href="#pay">Run the client</a>
-            <a href="#contract">API contract</a>
-            <a href="#security">Security model</a>
+            <a href="#install">Install</a>
+            <a href="#middleware">Guard a route</a>
+            <a href="#contract">The 402 requirement</a>
+            <a href="#status">Status codes</a>
+            <a href="#agent">Pay with your agent</a>
           </nav>
-          <div className="docs-network-card">
-            <span className="signal-dot" />
-            <div><strong>Base Mainnet</strong><small>Chain ID 8453</small></div>
-          </div>
         </aside>
 
         <main className="docs-main">
           <section className="docs-hero" id="quickstart">
             <div className="section-kicker">AgentPay quickstart</div>
-            <h1 aria-label="Ship your first paid request.">Ship your first<br /><em>paid request.</em></h1>
+            <h1 aria-label="Add a 402 payment gate to any route.">Add a 402 payment gate<br /><em>to any route.</em></h1>
             <p>
-              Inspect a real HTTP 402 endpoint, run a fail-closed preview, then explicitly authorize
-              one $0.01 USDC payment from your own agent.
+              Wrap an Express route with <code>paymentMiddleware</code>. Agents that call it without a
+              payment header receive an HTTP 402 body with the exact price, network, and recipient;
+              after paying, they retry with <code>X-Payment-Tx</code> and the middleware verifies the
+              receipt before your handler runs.
             </p>
-            <div className="docs-warning docs-warning--danger">
-              <ShieldAlert aria-hidden="true" />
-              <div>
-                <strong>REAL FUNDS · BASE MAINNET</strong>
-                <span>The execute command transfers real USDC and Base ETH is required for gas. No refunds.</span>
-              </div>
-            </div>
           </section>
 
-          <section className="docs-section" id="inspect">
+          <section className="docs-section" id="install">
             <div className="docs-section-number">01</div>
             <div className="docs-section-content">
-              <div className="docs-icon"><TerminalSquare aria-hidden="true" /></div>
-              <h2>Inspect the payment requirements</h2>
+              <div className="docs-icon"><Package aria-hidden="true" /></div>
+              <h2>Install the server package</h2>
               <p>
-                Start with a read-only request. Without a transaction header the API never returns premium data;
-                it publishes the exact amount, network, and recipient instead.
+                <code>@x402/server</code> is framework-agnostic verification plus an Express adapter.
+                It requires <code>viem</code> as a dependency.
               </p>
-              <CodeBlock label="Terminal" code={inspectCommand} />
-              <CodeBlock label="Live 402 response" code={paymentRequired} />
+              <CodeBlock label="Terminal" code={installCommand} />
             </div>
           </section>
 
-          <section className="docs-section" id="pay">
+          <section className="docs-section" id="middleware">
             <div className="docs-section-number">02</div>
             <div className="docs-section-content">
-              <div className="docs-icon"><KeyRound aria-hidden="true" /></div>
-              <h2>Run the guarded client</h2>
-              <p>
-                Clone the SDK and configure a dedicated low-balance wallet. The private key remains local;
-                AgentPay&apos;s server only verifies public transaction receipts.
-              </p>
-              <CodeBlock label="Clone and install" code={setupCommand} />
-              <CodeBlock label="web/.env.local" code={environmentExample} />
-              <h3>Preview first</h3>
-              <p>The default command validates the live quote and prints <code>PAYMENT NOT SENT</code>.</p>
-              <CodeBlock label="Safe preview" code={previewCommand} />
-              <h3>Authorize one payment</h3>
-              <p>
-                Payment requires two explicit signals: the environment opt-in and the <code>--execute</code> flag.
-              </p>
-              <CodeBlock label="Real payment" code={executeCommand} />
-              <div className="docs-warning">
-                <CircleAlert aria-hidden="true" />
-                <div><strong>After a transaction hash appears</strong><span>Never rerun until you inspect that hash on BaseScan.</span></div>
-              </div>
-            </div>
-          </section>
-
-          <section className="docs-section">
-            <div className="docs-section-number">03</div>
-            <div className="docs-section-content">
               <div className="docs-icon"><Code2 aria-hidden="true" /></div>
-              <h2>The policy-controlled request</h2>
+              <h2>Guard a route with the middleware</h2>
               <p>
-                The example pins every payment boundary before signing: URL, network, token, recipient,
-                and the exact 10,000 base-unit amount.
+                Place <code>paymentMiddleware</code> between the URL matcher and your handler. Without a
+                <code>X-Payment-Tx</code> header it returns <code>402</code>; with a valid receipt it calls
+                <code>next()</code> and your handler runs normally.
               </p>
-              <CodeBlock label="TypeScript" code={clientExample} />
-              <CodeBlock label="Paid response" code={paidResponse} />
+              <CodeBlock label="TypeScript" code={middlewareExample} />
             </div>
           </section>
 
           <section className="docs-section" id="contract">
+            <div className="docs-section-number">03</div>
+            <div className="docs-section-content">
+              <div className="docs-icon"><CircleX aria-hidden="true" /></div>
+              <h2>The 402 payment requirement</h2>
+              <p>
+                An unauthenticated request never reaches your data. It receives exact payment terms an
+                agent can act on: price in USDC (6-decimal base units), your recipient, and the chain.
+              </p>
+              <CodeBlock label="Live 402 response" code={paymentRequired} />
+              <h3>Paid request</h3>
+              <p>The agent pays and retries the same URL with the receipt hash in <code>X-Payment-Tx</code>.</p>
+              <CodeBlock label="Terminal" code={paidRequest} />
+            </div>
+          </section>
+
+          <section className="docs-section" id="status">
             <div className="docs-section-number">04</div>
             <div className="docs-section-content">
               <div className="docs-icon"><ServerCog aria-hidden="true" /></div>
-              <h2>API contract</h2>
-              <p><code>GET /api/premium</code> is dynamic, mainnet-only, and always returns <code>Cache-Control: no-store</code>.</p>
+              <h2>Status codes</h2>
+              <p>The middleware&apos;s response contract for every request to a guarded route.</p>
               <div className="docs-table-wrap">
                 <table>
                   <thead><tr><th>Status</th><th>Meaning</th><th>Client action</th></tr></thead>
@@ -196,29 +157,33 @@ export function DocsPage() {
                   </tbody>
                 </table>
               </div>
+              <p className="docs-footnote">
+                The middleware accepts an official-USDC <code>Transfer</code> receipt on the configured
+                chain, waits for one confirmation by default, and mounts an in-memory replay claim per
+                transaction hash. Raise <code>confirmations</code> and supply durable replay storage for
+                production traffic.
+              </p>
             </div>
           </section>
 
-          <section className="docs-section" id="security">
+          <section className="docs-section" id="agent">
             <div className="docs-section-number">05</div>
             <div className="docs-section-content">
-              <div className="docs-icon"><LockKeyhole aria-hidden="true" /></div>
-              <h2>Security model</h2>
-              <div className="security-list">
-                <div><CircleCheck aria-hidden="true" /><span><strong>Official USDC only</strong>Token logs are checked against the Base Mainnet contract.</span></div>
-                <div><CircleCheck aria-hidden="true" /><span><strong>Two confirmations</strong>The resource remains closed while a receipt is too recent.</span></div>
-                <div><CircleCheck aria-hidden="true" /><span><strong>Atomic replay claim</strong>Redis SET NX makes one transaction hash valid for one response.</span></div>
-                <div><CircleCheck aria-hidden="true" /><span><strong>No server wallet</strong>The public API stores no payer private key and cannot initiate transfers.</span></div>
+              <div className="docs-icon"><Bot aria-hidden="true" /></div>
+              <h2>Pay with your own AI agent</h2>
+              <p>
+                Give your agent a task to pay the live <code>AgentPay</code> endpoint and fetch the
+                premium data. Replace <code>[INSERT_PRIVATE_KEY]</code> with the private key your agent
+                should pay from, then paste the prompt into any capable AI agent.
+              </p>
+              <CodeBlock label="Agent prompt" code={agentPrompt} />
+              <div className="docs-warning docs-warning--danger">
+                <ShieldAlert aria-hidden="true" />
+                <div>
+                  <strong>REAL FUNDS · BASE MAINNET</strong>
+                  <span>The agent transfers real USDC. Use a dedicated low-balance wallet key, never your main key.</span>
+                </div>
               </div>
-              <p className="docs-bearer-warning">
-                A transaction hash is a public bearer receipt in this fixed-response demonstration.
-                Do not use this demo for secrets or user-specific entitlements without binding a unique
-                quote and authenticated payer identity to the request.
-              </p>
-              <p className="docs-footnote">
-                This endpoint demonstrates the payment primitive with a fixed response. Apply deployment-level
-                rate limiting, monitoring, and a dedicated RPC provider before wider production traffic.
-              </p>
             </div>
           </section>
         </main>

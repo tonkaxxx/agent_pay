@@ -74,7 +74,7 @@ export function LiveApiDemo() {
           {state.kind === "idle" ? <Play aria-hidden="true" /> : <RotateCcw aria-hidden="true" />}
           {state.kind === "idle" ? "Call live endpoint" : "Run again"}
         </button>
-        <a className="console-docs" href="/docs">Complete the paid request <ArrowRight aria-hidden="true" /></a>
+        <a className="console-docs" href="/docs#agent">Complete the paid request <ArrowRight aria-hidden="true" /></a>
         <span className="console-network">Base Mainnet · real funds</span>
       </div>
     </div>

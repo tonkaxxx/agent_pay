@@ -36,7 +36,7 @@ export function createVendorApp(config: {
       rpcUrl: config.rpcUrl,
     }),
     (_request, response) => response.json({
-      data: "The paid signal is 42.",
+      data: "Here is your premium data",
       paidWith: "USDC",
       network: config.network.network,
     }),

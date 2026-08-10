@@ -1,0 +1,15 @@
+.git
+.worktrees
+.superpowers
+docs
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/coverage
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+**/.env.local
+**/playwright-report
+**/test-results

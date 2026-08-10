@@ -28,6 +28,10 @@ test("calls the real endpoint and renders its HTTP 402 requirements", async () =
   expect(await screen.findAllByText("402 Payment Required")).toHaveLength(2);
   expect(screen.getByText(/"priceUsdc": "0.01"/)).toBeInTheDocument();
   expect(screen.getByText(/real funds/i)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /complete the paid request/i })).toHaveAttribute(
+    "href",
+    "/docs#agent",
+  );
 });
 
 test("shows a safe error state when the endpoint cannot be reached", async () => {
