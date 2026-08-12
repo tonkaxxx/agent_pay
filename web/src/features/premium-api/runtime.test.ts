@@ -49,7 +49,10 @@ test("builds the paid handler with CDP, exact Base USDC, discovery, and outer id
     paymentIdentifier: "required",
     discovery: { outputExample: expect.objectContaining({ protocol: "x402-v2" }) },
   }));
-  expect(protect).toHaveBeenCalledWith(expect.any(Function), { accepts: {} }, resourceServer);
+  expect(protect).toHaveBeenCalledWith(expect.any(Function), {
+    accepts: {},
+    resource: "https://agentpay.example/api/premium",
+  }, resourceServer);
 
   const response = await handler(new Request("https://agentpay.example/api/premium"));
   expect(response.status).toBe(402);

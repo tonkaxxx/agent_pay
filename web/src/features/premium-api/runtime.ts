@@ -63,22 +63,25 @@ export function buildPremiumHandler(
     facilitator,
     networks: ["eip155:8453"],
   });
-  const route = dependencies.createRoute({
-    network: "eip155:8453",
-    priceUsdc: "0.01",
-    payTo: config.payTo,
-    description: "AgentPay premium API",
-    mimeType: "application/json",
-    paymentIdentifier: "required",
-    discovery: {
-      outputExample: {
-        premiumData: "Here's your premium data — paid, verified, and unlocked by AgentPay.",
-        paidWith: "USDC",
-        network: "eip155:8453",
-        protocol: "x402-v2",
+  const route = {
+    ...dependencies.createRoute({
+      network: "eip155:8453",
+      priceUsdc: "0.01",
+      payTo: config.payTo,
+      description: "AgentPay premium API",
+      mimeType: "application/json",
+      paymentIdentifier: "required",
+      discovery: {
+        outputExample: {
+          premiumData: "Here's your premium data — paid, verified, and unlocked by AgentPay.",
+          paidWith: "USDC",
+          network: "eip155:8453",
+          protocol: "x402-v2",
+        },
       },
-    },
-  });
+    }),
+    resource: new URL("/api/premium", config.siteUrl).href,
+  } satisfies RouteConfig;
   const paidHandler = dependencies.protect(createPremiumHandler(), route, server);
   const store = new RedisPaymentIdempotencyStore(
     dependencies.createRedisClient(config.redisUrl),
