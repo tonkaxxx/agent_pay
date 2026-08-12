@@ -106,7 +106,7 @@ test("keeps local Redis private, healthy, and persistent", () => {
 Run:
 
 ```sh
-corepack pnpm --dir web vitest run docker-compose.test.ts
+corepack pnpm --dir web exec vitest run docker-compose.test.ts
 ```
 
 Expected: FAIL because the explicit production file is absent and the default
@@ -165,7 +165,7 @@ volumes:
 Run:
 
 ```sh
-corepack pnpm --dir web vitest run docker-compose.test.ts
+corepack pnpm --dir web exec vitest run docker-compose.test.ts
 docker compose -f web/docker-compose.yml config --quiet
 docker compose --env-file web/.env.production.example -f web/docker-compose.production.yml config --quiet
 ```
