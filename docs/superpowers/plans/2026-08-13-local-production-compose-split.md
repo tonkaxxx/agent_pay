@@ -124,8 +124,6 @@ external `web-net`, capability restrictions, and the persistent volume.
 Replace `web/docker-compose.yml` with:
 
 ```yaml
-name: agentpay-local
-
 services:
   web:
     build:
