@@ -110,8 +110,16 @@ corepack pnpm --dir web verify:production -- \
 ```
 
 To roll back, restore the backed-up Compose/env files (or set
-`AGENTPAY_IMAGE` to the recorded prior immutable tag), validate with
-`docker compose config --quiet`, and run `docker compose up -d --wait` again.
+`AGENTPAY_IMAGE` to the recorded prior immutable tag), then validate and restart
+the explicit production stack:
+
+```sh
+docker compose --env-file web/.env.production \
+  -f web/docker-compose.production.yml config --quiet
+docker compose --env-file web/.env.production \
+  -f web/docker-compose.production.yml up -d --remove-orphans --wait
+```
+
 Do not delete the Redis volume during rollback.
 
 The named volume plus `appendfsync everysec` protects idempotency across

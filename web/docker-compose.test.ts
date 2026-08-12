@@ -30,7 +30,16 @@ interface ComposeModel {
 const releaseSha = "0123456789abcdef0123456789abcdef01234567";
 const fixtureDirectory = mkdtempSync(join(tmpdir(), "agentpay-compose-"));
 
-function renderCompose(composePath: string, envPath: string): ComposeModel {
+function renderLocalCompose(directory: string): ComposeModel {
+  const output = execFileSync("docker", [
+    "compose",
+    "config",
+    "--format", "json",
+  ], { cwd: directory, encoding: "utf8" });
+  return JSON.parse(output) as ComposeModel;
+}
+
+function renderProductionCompose(composePath: string, envPath: string): ComposeModel {
   const output = execFileSync("docker", [
     "compose",
     "--env-file", envPath,
@@ -66,7 +75,7 @@ describe("local Compose", () => {
       "ALLOW_MAINNET_PAYMENTS=true",
       "",
     ].join("\n"), { mode: 0o600 });
-    model = renderCompose(composePath, envPath);
+    model = renderLocalCompose(localDirectory);
   });
 
   test("renders a source-built web service with safe seller credentials", () => {
@@ -84,6 +93,7 @@ describe("local Compose", () => {
       AGENT_PRIVATE_KEY: "",
       BASE_MAINNET_RPC_URL: "",
       ALLOW_MAINNET_PAYMENTS: "false",
+      CDP_API_KEY_ID: "organizations/test/apiKeys/test",
     });
     expect(web.depends_on?.redis?.condition).toBe("service_healthy");
     expect(model.networks ?? {}).not.toHaveProperty("web-net");
@@ -131,7 +141,7 @@ describe("production Compose", () => {
       "REDIS_PASSWORD=fixture-redis-password",
       "",
     ].join("\n"), { mode: 0o600 });
-    model = renderCompose("docker-compose.production.yml", envPath);
+    model = renderProductionCompose("docker-compose.production.yml", envPath);
   });
 
   test("renders an immutable hardened web service without buyer credentials", () => {
