@@ -4,6 +4,11 @@ AgentPay is a policy, security, and observability layer for agentic commerce bui
 
 The current release supports exact official USDC payments on Base (`eip155:8453`) and Base Sepolia (`eip155:84532`). It uses the standard `PAYMENT-REQUIRED`, `PAYMENT-SIGNATURE`, and `PAYMENT-RESPONSE` headers—there is no legacy `X-Payment-Tx` compatibility path.
 
+The live premium route returns an x402 v2 `402` whose JSON body is the decoded
+`PAYMENT-REQUIRED` value. This keeps curl output readable while the header
+remains the protocol source of truth. Payment Identifier is required so retries
+can be handled safely through the Redis idempotency layer.
+
 ## What is included
 
 - `@agentpay/client` 0.2.0: signer-first x402 v2 fetch, mandatory network allowlist and spend cap, custom authorization policy, Payment Identifier, and unified payment events.
@@ -147,6 +152,29 @@ pnpm lint
 pnpm build
 pnpm test:e2e
 ```
+
+## Production operations
+
+The supported single-host deployment is one hardened Docker Compose stack:
+AgentPay web plus private, authenticated, AOF-backed Redis behind the existing
+Traefik `web-net`. Production configuration rejects localhost origins, the demo
+recipient, quote-only mode, unauthenticated Redis, and any payer private key in
+the web environment.
+
+Build and publish the web image with a full-Git-SHA tag, then deploy that exact
+tag. The env template, rollout commands, public smoke verifier, durability
+boundary, and rollback procedure are documented in
+[`web/README.md`](web/README.md#single-server-production-deployment).
+
+```sh
+pnpm --dir web verify:production -- \
+  https://agentpay.thebestsites.ru \
+  0x58B0fF9Fd53C854f3779acdE649a7FAc2de2d1CB
+```
+
+This verifies the unpaid production challenge only. End-to-end settlement is a
+separate guarded action requiring a funded payer wallet; seller deployments do
+not receive payer signing material.
 
 ## Security notes
 

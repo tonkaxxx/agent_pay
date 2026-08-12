@@ -30,7 +30,9 @@ test("the actual API route publishes exact Base Mainnet requirements", async ({ 
   expect(response.status()).toBe(402);
   const encoded = response.headers()["payment-required"];
   expect(encoded).toBeTruthy();
-  expect(decodePaymentRequiredHeader(encoded!)).toMatchObject({
+  const decoded = decodePaymentRequiredHeader(encoded!);
+  expect(await response.json()).toEqual(decoded);
+  expect(decoded).toMatchObject({
     x402Version: 2,
     accepts: [{
       scheme: "exact",
@@ -38,6 +40,11 @@ test("the actual API route publishes exact Base Mainnet requirements", async ({ 
       payTo: "0x1111111111111111111111111111111111111111",
       network: "eip155:8453",
     }],
+    extensions: {
+      "payment-identifier": {
+        info: { required: true },
+      },
+    },
   });
 });
 

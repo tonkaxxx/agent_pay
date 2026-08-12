@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "verify:production": "node scripts/verify-production.mjs",
     "demo:premium": "tsx --env-file=.env.local examples/premium-client.ts"
   },
   "dependencies": {
