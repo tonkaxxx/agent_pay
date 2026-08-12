@@ -4,10 +4,12 @@ AgentPay is a policy, security, and observability layer for agentic commerce bui
 
 The current release supports exact official USDC payments on Base (`eip155:8453`) and Base Sepolia (`eip155:84532`). It uses the standard `PAYMENT-REQUIRED`, `PAYMENT-SIGNATURE`, and `PAYMENT-RESPONSE` headers—there is no legacy `X-Payment-Tx` compatibility path.
 
-The live premium route returns an x402 v2 `402` whose JSON body is the decoded
-`PAYMENT-REQUIRED` value. This keeps curl output readable while the header
-remains the protocol source of truth. Payment Identifier is required so retries
-can be handled safely through the Redis idempotency layer.
+The live premium route preserves AgentPay's concise pre-v2 `402` JSON for curl
+and the website (`error`, `priceUsdc`, `payTo`, `network`, and `chainId`). The
+standard `PAYMENT-REQUIRED` header remains the x402 v2 protocol source of truth,
+and Payment Identifier remains required for safe Redis-backed retries. Bazaar
+output discovery is disabled on this endpoint so an unpaid challenge never
+reveals premium response content.
 
 ## What is included
 

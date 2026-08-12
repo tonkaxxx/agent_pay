@@ -10,17 +10,28 @@ cp web/.env.example web/.env.local
 corepack pnpm dev:web
 ```
 
-An unpaid request is safe to inspect. Its standard x402 terms are in the
-`PAYMENT-REQUIRED` header and the same decoded challenge is mirrored into the
-JSON body for ordinary curl users:
+An unpaid request is safe to inspect. For compatibility with the pre-v2 public
+API, an ordinary request receives the concise AgentPay quote in its JSON body:
 
 ```sh
 curl -i http://localhost:3000/api/premium
 ```
 
-Protocol clients must continue to read the standard header. The body is a
-readability aid generated from that header; AgentPay does not maintain a second
-copy of the payment terms.
+```json
+{
+  "error": "Payment Required",
+  "priceUsdc": "0.01",
+  "payTo": "0x58B0fF9Fd53C854f3779acdE649a7FAc2de2d1CB",
+  "network": "base",
+  "chainId": 8453
+}
+```
+
+Under the hood, protocol clients continue to read the standard
+`PAYMENT-REQUIRED` header and pay through x402 v2. The compatibility body does
+not replace that header and the obsolete `X-Payment-Tx` flow is not supported.
+Bazaar output discovery is intentionally disabled for this endpoint so an
+unpaid challenge never contains a copy or example of the premium response.
 
 ## Deployment variables
 

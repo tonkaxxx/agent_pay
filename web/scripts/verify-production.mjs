@@ -71,9 +71,20 @@ async function main() {
   } catch {
     throw new Error("payment challenge is not valid x402 JSON");
   }
-  invariant(isDeepStrictEqual(body, decoded), "402 body does not match PAYMENT-REQUIRED");
+  invariant(isDeepStrictEqual(body, {
+    error: "Payment Required",
+    priceUsdc: "0.01",
+    payTo: recipient,
+    network: "base",
+    chainId: 8453,
+  }), "402 body does not match the legacy AgentPay quote");
   invariant(decoded.x402Version === EXPECTED.x402Version, "unexpected x402 version");
   invariant(decoded.resource?.url === premiumUrl.href, "unexpected protected resource URL");
+  invariant(decoded.extensions?.bazaar === undefined, "Bazaar discovery must be disabled");
+  invariant(
+    !JSON.stringify(decoded).includes("premiumData"),
+    "payment challenge exposes premium output",
+  );
 
   const accepted = decoded.accepts?.find(requirement =>
     requirement.scheme === EXPECTED.scheme
@@ -93,11 +104,13 @@ async function main() {
   process.stdout.write(`${JSON.stringify({
     homepage: homepage.status,
     premium: premium.status,
+    legacyBody: true,
     x402Version: decoded.x402Version,
     scheme: accepted.scheme,
     network: accepted.network,
     amount: accepted.amount,
     paymentIdentifierRequired: true,
+    bazaarPresent: false,
   })}\n`);
 }
 
