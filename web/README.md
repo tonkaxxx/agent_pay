@@ -10,6 +10,30 @@ cp web/.env.example web/.env.local
 corepack pnpm dev:web
 ```
 
+To run the complete local stack, including persistent Redis, use the default
+Compose file:
+
+```sh
+cd web
+docker compose down
+docker compose up -d --build
+docker compose ps
+curl -i http://localhost:3000/api/premium
+```
+
+After the image has been built and the source and dependencies have not
+changed, the short restart command works as-is:
+
+```sh
+docker compose down && docker compose up -d
+```
+
+The local stack reads `.env.local`, binds the application only to
+`127.0.0.1:3000`, and keeps Redis on the private Compose network with a named
+volume. It overrides the buyer private key and Base RPC URL with empty values
+inside the seller container and forces `ALLOW_MAINNET_PAYMENTS=false`. Use
+`--build` again after source or dependency changes.
+
 An unpaid request is safe to inspect. For compatibility with the pre-v2 public
 API, an ordinary request receives the concise AgentPay quote in its JSON body:
 
@@ -64,11 +88,11 @@ chmod 600 web/.env.production
 # openssl rand -hex 32
 
 docker compose --env-file web/.env.production \
-  -f web/docker-compose.yml config --quiet
+  -f web/docker-compose.production.yml config --quiet
 docker compose --env-file web/.env.production \
-  -f web/docker-compose.yml pull
+  -f web/docker-compose.production.yml pull
 docker compose --env-file web/.env.production \
-  -f web/docker-compose.yml up -d --remove-orphans --wait
+  -f web/docker-compose.production.yml up -d --remove-orphans --wait
 ```
 
 The Compose file converts `REDIS_PASSWORD` into the internal authenticated

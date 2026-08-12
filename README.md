@@ -163,6 +163,12 @@ Traefik `web-net`. Production configuration rejects localhost origins, the demo
 recipient, quote-only mode, unauthenticated Redis, and any payer private key in
 the web environment.
 
+[`web/docker-compose.yml`](web/docker-compose.yml) is the local development
+stack used by plain `docker compose` commands from `web/`.
+[`web/docker-compose.production.yml`](web/docker-compose.production.yml) is the
+explicit hardened deployment model and must be selected for production with
+`-f web/docker-compose.production.yml`.
+
 Build and publish the web image with a full-Git-SHA tag, then deploy that exact
 tag. The env template, rollout commands, public smoke verifier, durability
 boundary, and rollback procedure are documented in
