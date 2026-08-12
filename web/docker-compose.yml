@@ -1,18 +1,86 @@
+name: agentpay
+
 services:
   web:
-    build:
-      context: ..
-      dockerfile: web/Dockerfile
-    ports:
-      - "3000:3000"
+    image: ${AGENTPAY_IMAGE:?set an immutable AgentPay image tag}
+    container_name: agentpay-app
     environment:
-      REDIS_URL: redis://redis:6379
-    env_file:
-      - .env.local
+      NODE_ENV: production
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?set the public HTTPS origin}
+      AGENTPAY_PAY_TO: ${AGENTPAY_PAY_TO:?set the Base Mainnet recipient}
+      CDP_API_KEY_ID: ${CDP_API_KEY_ID:?set the CDP API key ID}
+      CDP_API_KEY_SECRET: ${CDP_API_KEY_SECRET:?set the CDP API key secret}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set a strong Redis password}@redis:6379
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+      - /app/web/.next/cache:rw,noexec,nosuid,nodev,uid=1000,gid=1000,mode=0750
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/api/basic').then(response=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - web-net
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.7-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set a strong Redis password}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        umask 077
+        printf 'requirepass %s\nappendonly yes\nappendfsync everysec\ndir /data\n' "$$REDIS_PASSWORD" > /tmp/redis.conf
+        chown redis:redis /tmp/redis.conf /data
+        exec gosu redis redis-server /tmp/redis.conf
     restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - redis-data:/data
+    networks:
+      - backend
+
+networks:
+  backend:
+    internal: true
+  web-net:
+    external: true
+
+volumes:
+  redis-data:

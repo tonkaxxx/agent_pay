@@ -28,10 +28,11 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 WORKDIR /app
-COPY --from=builder /app/package.json /app/pnpm-workspace.yaml ./
-COPY --from=builder /app/packages ./packages/
-COPY --from=builder /app/node_modules ./node_modules/
-COPY --from=builder /app/web ./web/
+COPY --from=builder --chown=node:node /app/package.json /app/pnpm-workspace.yaml ./
+COPY --from=builder --chown=node:node /app/packages ./packages/
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules/
+COPY --from=builder --chown=node:node /app/web ./web/
 WORKDIR /app/web
+USER node
 EXPOSE 3000
 CMD ["node", "node_modules/next/dist/bin/next", "start"]

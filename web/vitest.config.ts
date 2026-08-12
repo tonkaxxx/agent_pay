@@ -13,7 +13,11 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}", "examples/**/*.test.ts"],
+    include: [
+      "src/**/*.test.{ts,tsx}",
+      "examples/**/*.test.ts",
+      "docker-compose.test.ts",
+    ],
     clearMocks: true,
   },
 });
