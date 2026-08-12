@@ -1,5 +1,7 @@
 # Безопасный mainnet-режим для x402 USDC demo
 
+> Superseded by the [x402 v2 migration](../plans/2026-08-12-x402-v2-migration.md). Retained as v1 design history.
+
 Дата: 2026-08-03
 Статус: утверждён пользователем
 

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Builds the AgentPay Next.js site (web/) from the pnpm monorepo root.
-# The app links the local @x402/client and @x402/server workspace packages,
+# The app links the local @agentpay/client and @agentpay/server workspace packages,
 # so the entire repository is the build context (see docker-compose.yml).
 
 FROM node:22-alpine AS base
@@ -20,7 +20,7 @@ FROM deps AS builder
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY web/ ./web/
 COPY examples/ ./examples/
-RUN pnpm --recursive --filter '@x402/server' --filter '@x402/client' run build
+RUN pnpm --recursive --filter '@agentpay/server' --filter '@agentpay/client' run build
 RUN pnpm --dir web build
 
 FROM base AS runner

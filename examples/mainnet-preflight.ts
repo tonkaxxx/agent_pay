@@ -8,7 +8,7 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 
-import { USDC_BASE, type PaymentAuthorizationContext } from "@x402/client";
+import { USDC_BASE, type PaymentAuthorizationContext } from "@agentpay/client";
 
 import { DEMO_PRICE_USDC } from "./demo-config.js";
 
@@ -109,7 +109,7 @@ export async function authorizeMainnetPayment(
   options.log(`Agent address: ${options.agentAddress}`);
   options.log(`Vendor URL: ${options.context.requestUrl}`);
   options.log(`Chain ID: ${options.context.chainId}`);
-  options.log(`Recipient: ${options.context.payTo}`);
+  options.log(`Recipient: ${options.context.recipient}`);
   options.log(`USDC token: ${options.context.token}`);
   options.log(`Price: ${DEMO_PRICE_USDC} USDC (${DEMO_AMOUNT_USDC} base units)`);
   options.log(`USDC balance: ${formatUnits(usdcBalance, 6)} USDC`);
@@ -129,7 +129,7 @@ export async function authorizeMainnetPayment(
   }
 
   options.log(`Chain ID: ${options.context.chainId}`);
-  options.log(`Recipient: ${options.context.payTo}`);
+  options.log(`Recipient: ${options.context.recipient}`);
   options.log(`Amount: ${DEMO_PRICE_USDC} USDC (${DEMO_AMOUNT_USDC} base units)`);
   return true;
 }
@@ -197,10 +197,10 @@ function validateStaticPayment(options: MainnetPreflightOptions): void {
   if (context.chainId !== BASE_CHAIN_ID) {
     throw new MainnetPreflightError("Payment chain must be Base Mainnet (8453).");
   }
-  if (context.network !== "base") {
-    throw new MainnetPreflightError("Payment network must be base.");
+  if (context.network !== "eip155:8453") {
+    throw new MainnetPreflightError("Payment network must be eip155:8453.");
   }
-  if (context.payTo !== options.expectedPayTo) {
+  if (context.recipient !== options.expectedPayTo) {
     throw new MainnetPreflightError("Payment recipient does not match the expected Vendor wallet.");
   }
   if (context.token !== USDC_BASE) {

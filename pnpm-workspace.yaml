@@ -2,8 +2,15 @@ packages:
   - "packages/*"
   - "web"
 allowBuilds:
+  '@coinbase/x402': false
   esbuild: true
   unrs-resolver: true
 minimumReleaseAgeExclude:
   - tsx@4.23.4
   - lucide-react@1.31.0
+  - '@x402/core@2.22.0'
+  - '@x402/evm@2.22.0'
+  - '@x402/express@2.22.0'
+  - '@x402/extensions@2.22.0'
+  - '@x402/fetch@2.22.0'
+  - '@x402/next@2.22.0'

@@ -2,6 +2,7 @@
 
 import { ArrowRight, LoaderCircle, Play, RotateCcw } from "lucide-react";
 import { useState } from "react";
+import { decodePaymentRequiredHeader } from "@x402/core/http";
 
 type Endpoint = "basic" | "premium";
 
@@ -27,7 +28,10 @@ export function LiveApiDemo() {
         cache: "no-store",
         headers: { Accept: "application/json" },
       });
-      const payload: unknown = await response.json();
+      const paymentRequired = response.headers.get("PAYMENT-REQUIRED");
+      const payload: unknown = paymentRequired === null
+        ? await response.json()
+        : decodePaymentRequiredHeader(paymentRequired);
       setState({ kind: "response", status: response.status, payload });
     } catch {
       setState({ kind: "error" });

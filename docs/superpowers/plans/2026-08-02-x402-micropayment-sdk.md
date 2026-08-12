@@ -1,5 +1,7 @@
 # X402 Micropayment SDK Implementation Plan
 
+> Superseded by [AgentPay x402 v2 Migration Plan](2026-08-12-x402-v2-migration.md). Retained as v1 implementation history.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Создать два publishable TypeScript-пакета и рабочее Base Sepolia демо для HTTP 402-платежей в USDC.

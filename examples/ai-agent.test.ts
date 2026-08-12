@@ -9,7 +9,7 @@ import {
   type AgentFetch,
   type AgentFetchConfig,
   type PaymentAuthorizationContext,
-} from "@x402/client";
+} from "@agentpay/client";
 
 import { runAgentDemo } from "./ai-agent.js";
 import {
@@ -22,18 +22,22 @@ const hash = `0x${"ab".repeat(32)}` as Hash;
 const testPrivateKey = `0x${"11".repeat(32)}` as Hex;
 const context: PaymentAuthorizationContext = {
   requestUrl: "http://127.0.0.1:3000/api/data",
+  paymentId: "pay_agentpay_mainnet_1234",
+  scheme: "exact",
   chainId: 8453,
-  network: "base",
-  payTo,
+  network: "eip155:8453",
+  recipient: payTo,
   token: USDC_BASE,
   priceUsdc: "0.01",
   amount: 10_000n,
 };
 const sepoliaContext: PaymentAuthorizationContext = {
   requestUrl: "http://localhost:3000/api/data",
+  paymentId: "pay_agentpay_sepolia_1234",
+  scheme: "exact",
   chainId: 84532,
-  network: "base-sepolia",
-  payTo,
+  network: "eip155:84532",
+  recipient: payTo,
   token: USDC_BASE_SEPOLIA,
   priceUsdc: "0.10",
   amount: 100_000n,
@@ -120,12 +124,13 @@ describe("runAgentDemo", () => {
     });
     await runAgentDemo("sepolia", [], sepoliaEnvironment, dependencies);
     expect(createAgentFetch).toHaveBeenCalledWith(expect.objectContaining({
-      rpcUrl: "https://sepolia.base.org/",
+      signer: expect.objectContaining({ address: expect.any(String) }),
+      networks: ["eip155:84532"],
       maxPaymentUsdc: "0.10",
     }));
     const config = createAgentFetch.mock.calls[0]![0];
     expect(config.authorizePayment).toEqual(expect.any(Function));
-    expect(config.onTransactionSubmitted).toBeUndefined();
+    expect(config.onPaymentEvent).toBeUndefined();
   });
 
   test("treats a successful mainnet preflight without execute as a no-payment success", async () => {
@@ -152,15 +157,15 @@ describe("runAgentDemo", () => {
     expect(createAgentFetch.mock.calls[0]![0].maxPaymentUsdc).toBe("0.01");
   });
 
-  test("waits for extra confirmation and retries temporary verification only on mainnet", async () => {
+  test("uses signer-first x402 v2 configuration on mainnet", async () => {
     const { dependencies, createAgentFetch } = dependenciesForAgent();
 
     await runAgentDemo("mainnet", [], mainnetEnvironment, dependencies);
 
     expect(createAgentFetch.mock.calls[0]![0]).toMatchObject({
-      confirmations: 2,
-      paymentVerificationRetries: 3,
-      paymentVerificationRetryDelayMs: 1_000,
+      signer: expect.objectContaining({ address: expect.any(String) }),
+      networks: ["eip155:8453"],
+      onPaymentEvent: expect.any(Function),
     });
   });
 
@@ -197,8 +202,8 @@ describe("runAgentDemo", () => {
       "Unrelated authorization denial.",
     )],
     ["fetch", new TypeError("fetch failed")],
-    ["transfer", new X402PaymentError("transfer_failed", "transfer failed")],
-    ["receipt", new X402PaymentError("transaction_failed", "receipt failed")],
+    ["sign", new X402PaymentError("payment_creation_failed", "sign", "sign failed")],
+    ["settle", new X402PaymentError("payment_settlement_failed", "settle", "settle failed")],
     ["retry", new TypeError("retry failed")],
   ] as const)("propagates %s failure", async (_label, requestError) => {
     const { dependencies } = dependenciesForAgent({ requestError });
@@ -222,12 +227,10 @@ describe("runAgentDemo", () => {
     const { dependencies, createAgentFetch, log } = dependenciesForAgent();
     await runAgentDemo("mainnet", [], mainnetEnvironment, dependencies);
     const config = createAgentFetch.mock.calls[0]![0];
-    await config.onTransactionSubmitted?.({
-      hash,
-      chainId: 8453,
-      token: USDC_BASE,
-      payTo,
-      amount: 10_000n,
+    await config.onPaymentEvent?.({
+      type: "payment_settled",
+      context,
+      transaction: hash,
     });
     const output = log.mock.calls.flat().join("\n");
     expect(output).toContain(hash);

@@ -1,6 +1,6 @@
 import { getAddress, type Address, type Hex } from "viem";
 
-import { getUsdcAddress, type SupportedChainId } from "@x402/server";
+import { USDC_BASE, USDC_BASE_SEPOLIA, type AgentPayNetwork } from "@agentpay/server";
 
 export const DEMO_PRICE_USDC = "0.01";
 
@@ -8,8 +8,8 @@ export type DemoMode = "sepolia" | "mainnet";
 
 export interface DemoNetwork {
   readonly mode: DemoMode;
-  readonly chainId: SupportedChainId;
-  readonly network: "base" | "base-sepolia";
+  readonly chainId: 8453 | 84532;
+  readonly network: AgentPayNetwork;
   readonly rpcEnvironmentName: "BASE_MAINNET_RPC_URL" | "BASE_SEPOLIA_RPC_URL";
   readonly usdcAddress: Address;
   readonly explorerUrl: string;
@@ -20,18 +20,18 @@ export const DEMO_NETWORKS: Readonly<Record<DemoMode, DemoNetwork>> = {
   sepolia: {
     mode: "sepolia",
     chainId: 84532,
-    network: "base-sepolia",
+    network: "eip155:84532",
     rpcEnvironmentName: "BASE_SEPOLIA_RPC_URL",
-    usdcAddress: getUsdcAddress(84532),
+    usdcAddress: USDC_BASE_SEPOLIA,
     explorerUrl: "https://sepolia-explorer.base.org",
     realFunds: false,
   },
   mainnet: {
     mode: "mainnet",
     chainId: 8453,
-    network: "base",
+    network: "eip155:8453",
     rpcEnvironmentName: "BASE_MAINNET_RPC_URL",
-    usdcAddress: getUsdcAddress(8453),
+    usdcAddress: USDC_BASE,
     explorerUrl: "https://base.blockscout.com",
     realFunds: true,
   },

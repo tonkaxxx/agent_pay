@@ -1,9 +1,6 @@
 # AgentPay web
 
-Investor landing page, developer docs, and the paid Base Mainnet API for
-AgentPay. The app is a Next.js workspace package and imports the local
-`@x402/client` and `@x402/server` packages, so install and build it from the
-repository root.
+The Next.js investor site, developer docs, and live `$0.01` Base mainnet x402 v2 API. The app imports the local `@agentpay/client` and `@agentpay/server` workspace packages.
 
 ## Local development
 
@@ -13,8 +10,7 @@ cp web/.env.example web/.env.local
 corepack pnpm dev:web
 ```
 
-Open `http://localhost:3000`. A request without `X-Payment-Tx` can inspect the
-live quote without spending funds:
+An unpaid request is safe to inspect. Its standard x402 terms are in the `PAYMENT-REQUIRED` header:
 
 ```sh
 curl -i http://localhost:3000/api/premium
@@ -25,36 +21,14 @@ curl -i http://localhost:3000/api/premium
 | Variable | Purpose |
 | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Canonical public HTTPS origin |
-| `AGENTPAY_PAY_TO` | Checksummed Base recipient for the 0.01 USDC payment |
-| `BASE_MAINNET_RPC_URL` | Base Mainnet receipt RPC |
-| `REDIS_URL` | Durable `redis://` or TLS `rediss://` replay store |
+| `AGENTPAY_PAY_TO` | Base recipient for the fixed `$0.01` USDC payment |
+| `CDP_API_KEY_ID` | CDP facilitator API key identifier |
+| `CDP_API_KEY_SECRET` | CDP facilitator API key secret |
+| `REDIS_URL` | Shared `redis://` or TLS `rediss://` idempotency store |
 
-The four client-example values at the bottom of `.env.example` are local-only.
-The private-key placeholder is deliberately invalid. Replace it with a dedicated
-low-balance wallet key for the local client only, never fund the placeholder,
-and never deploy `AGENT_PRIVATE_KEY` with the website.
+`AGENT_PRIVATE_KEY` is used only by the guarded local client example. Never deploy it with the web server. A real client payment requires both the `--execute` argument and `ALLOW_MAINNET_PAYMENTS=true`.
 
-Build from the repository root with `corepack pnpm build`, then run
-`corepack pnpm --dir web start`. On a managed Next.js provider, retain the
-repository workspace root during install so both local SDK packages are
-available.
-
-## Guarded payment example
-
-The `/docs` page describes the complete workflow. With `web/.env.local`
-configured, preview the server's quote using:
-
-```sh
-corepack pnpm --dir web demo:premium
-```
-
-The preview ends with `PAYMENT NOT SENT`. A real transfer requires both the
-`--execute` argument and `ALLOW_MAINNET_PAYMENTS=true`; it uses real USDC and
-Base ETH and cannot be refunded.
-
-`X-Payment-Tx` is a public bearer receipt in this fixed, non-sensitive demo.
-Before protecting secrets or user-specific data, extend the protocol so a
-unique quote and authenticated payer identity are bound to each request.
+The API uses the official Next x402 wrapper and CDP facilitator. Redis atomically leases Payment Identifiers and replays completed responses, including the original `PAYMENT-RESPONSE`, without persisting raw payment signatures.
 
 ## Verification
 

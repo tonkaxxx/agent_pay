@@ -5,8 +5,10 @@ type PremiumEnvironment = Readonly<Record<string, string | undefined>>;
 export interface PremiumConfig {
   readonly siteUrl: string;
   readonly payTo: Address;
-  readonly rpcUrl: string;
   readonly redisUrl: string;
+  readonly cdpApiKeyId: string;
+  readonly cdpApiKeySecret: string;
+  readonly offlineQuoteOnly: boolean;
 }
 
 function required(environment: PremiumEnvironment, name: string): string {
@@ -58,10 +60,9 @@ export function loadPremiumConfig(environment: PremiumEnvironment): PremiumConfi
       "NEXT_PUBLIC_SITE_URL",
     ),
     payTo,
-    rpcUrl: httpUrl(
-      required(environment, "BASE_MAINNET_RPC_URL"),
-      "BASE_MAINNET_RPC_URL",
-    ),
     redisUrl: redisUrl(required(environment, "REDIS_URL")),
+    cdpApiKeyId: required(environment, "CDP_API_KEY_ID"),
+    cdpApiKeySecret: required(environment, "CDP_API_KEY_SECRET"),
+    offlineQuoteOnly: environment.AGENTPAY_OFFLINE_QUOTE_ONLY === "true",
   };
 }

@@ -1,5 +1,7 @@
 import request from "supertest";
-import { expect, test } from "vitest";
+import { decodePaymentRequiredHeader } from "@x402/core/http";
+import type { FacilitatorClient } from "@agentpay/server";
+import { expect, test, vi } from "vitest";
 
 import { DEMO_NETWORKS } from "./demo-config.js";
 import {
@@ -8,27 +10,44 @@ import {
   vendorRuntimeConfiguration,
 } from "./vendor-api.js";
 
+function facilitator(network: "eip155:8453" | "eip155:84532"): FacilitatorClient {
+  return {
+    verify: vi.fn(),
+    settle: vi.fn(),
+    getSupported: vi.fn().mockResolvedValue({
+      kinds: [{ x402Version: 2, scheme: "exact", network }],
+      extensions: ["payment-identifier"],
+      signers: {},
+    }),
+  };
+}
+
 test.each([
-  ["Sepolia", DEMO_NETWORKS.sepolia, "base-sepolia", 84532],
-  ["Mainnet", DEMO_NETWORKS.mainnet, "base", 8453],
-] as const)("returns Base %s payment requirements without RPC verification", async (
+  ["Sepolia", DEMO_NETWORKS.sepolia, "eip155:84532"],
+  ["Mainnet", DEMO_NETWORKS.mainnet, "eip155:8453"],
+] as const)("returns standard x402 v2 Base %s payment requirements", async (
   _label,
   network,
   expectedNetwork,
-  expectedChainId,
 ) => {
   const app = createVendorApp({
     vendorWalletAddress: "0x1111111111111111111111111111111111111111",
-    rpcUrl: network.realFunds ? "https://mainnet.base.org" : "https://sepolia.base.org",
     network,
-  });
+  }, facilitator(network.network));
 
-  await request(app).get("/api/data").expect(402).expect(({ body }) => {
-    expect(body).toMatchObject({
-      error: "Payment Required",
-      priceUsdc: "0.01",
-      network: expectedNetwork,
-      chainId: expectedChainId,
+  await request(app).get("/api/data").expect(402).expect(({ headers }) => {
+    const encoded = headers["payment-required"];
+    expect(encoded).toBeTypeOf("string");
+    expect(decodePaymentRequiredHeader(encoded as string)).toMatchObject({
+      x402Version: 2,
+      accepts: [{
+        scheme: "exact",
+        amount: "10000",
+        network: expectedNetwork,
+      }],
+      extensions: {
+        "payment-identifier": { info: { required: false } },
+      },
     });
   });
 });
@@ -67,7 +86,7 @@ test("starts the mainnet Vendor server only on loopback and prints real-funds wa
   expect(messages).toEqual(expect.arrayContaining([
     "BASE MAINNET / REAL FUNDS",
     "Price: 0.01 USDC",
-    "Replay store: in-memory only",
+    "Idempotency store: in-memory only",
     "Refunds: unavailable",
   ]));
 });

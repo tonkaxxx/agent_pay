@@ -21,7 +21,7 @@ const founderMail = "mailto:maltsev.yar@gmail.com?subject=AgentPay%20investment%
 const proofPoints = [
   ["Status", "Working MVP"],
   ["Settlement", "USDC on Base"],
-  ["Protocol", "Native HTTP 402"],
+  ["Protocol", "Official x402 v2"],
   ["Live price", "$0.01 / request"],
 ] as const;
 
@@ -35,14 +35,14 @@ const protocolSteps = [
   {
     number: "02",
     title: "Discover & pay",
-    copy: "HTTP 402 returns exact USDC terms. Local policy approves the origin, chain and spend.",
-    code: "402 · 0.01 USDC",
+    copy: "PAYMENT-REQUIRED returns exact USDC terms. Local policy approves origin, chain and spend.",
+    code: "402 · exact USDC",
   },
   {
     number: "03",
     title: "Verify & unlock",
-    copy: "The API verifies the onchain receipt, atomically claims it, and releases the resource.",
-    code: "200 · premium data",
+    copy: "A facilitator verifies and settles the authorization; idempotency releases the resource once.",
+    code: "PAYMENT-RESPONSE · 200",
   },
 ] as const;
 
@@ -62,8 +62,8 @@ const pillars = [
   {
     icon: LockKeyhole,
     number: "03",
-    title: "Verified onchain",
-    copy: "Receipts, confirmations, official USDC transfer logs and durable replay protection gate every response.",
+    title: "Observable & idempotent",
+    copy: "Lifecycle events, facilitator settlement, Payment Identifiers, and durable response replay make agent spend auditable.",
   },
 ] as const;
 
@@ -97,8 +97,8 @@ export function LandingPage() {
           </h1>
           <div className="hero-bottom">
             <p>
-              AgentPay turns HTTP 402 into an autonomous USDC payment flow for AI agents.
-              Discover a price, pay within policy, and continue — no accounts, invoices, or human checkout.
+              AgentPay is the policy, security, and observability layer for x402 agent commerce.
+              Discover a price, authorize within policy, settle, and continue — without human checkout.
             </p>
             <div className="hero-actions">
               <a className="button button--primary" href="#live-api">
@@ -171,7 +171,7 @@ export function LandingPage() {
             <h2 id="live-api-title">Not a mockup.<br /><em>A paid API.</em></h2>
             <p>
               Call the public endpoint. It quotes exactly $0.01 in real USDC on Base.
-              A verified transaction hash unlocks the premium response once — and only once.
+              A facilitator-verified x402 authorization unlocks the premium response once — and only once.
               The returned text is intentionally fixed and non-sensitive: this proves settlement,
               not authenticated access control.
             </p>
@@ -228,7 +228,7 @@ export function LandingPage() {
 
       <footer className="site-footer">
         <Link className="wordmark wordmark--footer" href="/">AgentPay</Link>
-        <p>APIs that can price, settle and continue.</p>
+        <p>Policy and observability for APIs that price, settle and continue.</p>
         <div className="footer-links">
           <a href="https://github.com/tonkaxxx/agent_pay" target="_blank" rel="noreferrer">
             GitHub
@@ -236,7 +236,7 @@ export function LandingPage() {
           <Link href="/docs">Docs</Link>
           <a href={founderMail}>Contact</a>
         </div>
-        <div className="footer-bottom"><span>© 2026 AgentPay</span><span>Base Mainnet · USDC · HTTP 402</span></div>
+        <div className="footer-bottom"><span>© 2026 AgentPay</span><span>Base Mainnet · USDC · x402 v2</span></div>
       </footer>
     </div>
   );

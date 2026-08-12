@@ -12,8 +12,8 @@
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {
-      "@x402/server": ["./packages/server/src/index.ts"],
-      "@x402/client": ["./packages/client/src/index.ts"]
+      "@agentpay/server": ["./packages/server/src/index.ts"],
+      "@agentpay/client": ["./packages/client/src/index.ts"]
     }
   },
   "include": ["examples/**/*.ts", "vitest.config.ts"]

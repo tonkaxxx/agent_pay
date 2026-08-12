@@ -1,49 +1,65 @@
+import { x402Client, type PaymentCreationContext, type PaymentResponseContext } from "@x402/core/client";
+import type { PaymentPayload, PaymentRequirements } from "@x402/core/types";
+import { ExactEvmScheme, type ClientEvmSigner } from "@x402/evm";
 import {
-  createPublicClient,
-  createWalletClient,
-  getAddress,
-  http,
-  parseAbi,
-  parseUnits,
-  type Address,
-  type Hash,
-  type Hex,
-} from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { base, baseSepolia } from "viem/chains";
+  appendPaymentIdentifierToExtensions,
+  generatePaymentId,
+  isValidPaymentId,
+  PAYMENT_IDENTIFIER,
+} from "@x402/extensions/payment-identifier";
+import { wrapFetchWithPayment } from "@x402/fetch";
+import { formatUnits, getAddress, parseUnits, type Address } from "viem";
+
+export const USDC_BASE: Address = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+export const USDC_BASE_SEPOLIA: Address = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+
+export type AgentPayNetwork = "eip155:8453" | "eip155:84532";
+export type PaymentChainId = 8453 | 84532;
+export type PaymentNetwork = AgentPayNetwork;
 
 export type ProtocolErrorCode =
   | "invalid_payment_response"
-  | "unsupported_chain"
-  | "network_mismatch"
+  | "unsupported_network"
+  | "unsupported_scheme"
+  | "unsupported_asset"
   | "payment_limit_exceeded"
   | "payment_not_authorized";
 
-export type PaymentChainId = 8453 | 84532;
-export type PaymentNetwork = "base" | "base-sepolia";
+export type PaymentErrorCode =
+  | "payment_creation_failed"
+  | "payment_verification_failed"
+  | "payment_settlement_failed"
+  | "payment_failed";
+
+export type PaymentFailureStage = "parse" | "policy" | "sign" | "verify" | "settle" | "error";
 
 export interface PaymentAuthorizationContext {
   readonly requestUrl: string;
+  readonly paymentId: string;
+  readonly scheme: "exact";
+  readonly network: AgentPayNetwork;
   readonly chainId: PaymentChainId;
-  readonly network: PaymentNetwork;
-  readonly payTo: Address;
+  readonly recipient: Address;
   readonly token: Address;
   readonly priceUsdc: string;
   readonly amount: bigint;
 }
 
-export interface PaymentTransactionContext {
-  readonly hash: Hash;
-  readonly chainId: PaymentChainId;
-  readonly token: Address;
-  readonly payTo: Address;
-  readonly amount: bigint;
-}
-
-export type PaymentErrorCode =
-  | "rpc_chain_mismatch"
-  | "transfer_failed"
-  | "transaction_failed";
+export type PaymentEvent =
+  | { readonly type: "payment_required"; readonly context: PaymentAuthorizationContext }
+  | { readonly type: "payment_authorized"; readonly context: PaymentAuthorizationContext }
+  | {
+    readonly type: "payment_settled";
+    readonly context: PaymentAuthorizationContext;
+    readonly transaction: string;
+  }
+  | {
+    readonly type: "payment_failed";
+    readonly requestUrl: string;
+    readonly paymentId?: string;
+    readonly stage: PaymentFailureStage;
+    readonly error: Error;
+  };
 
 export class X402ProtocolError extends Error {
   constructor(
@@ -59,6 +75,7 @@ export class X402ProtocolError extends Error {
 export class X402PaymentError extends Error {
   constructor(
     public readonly code: PaymentErrorCode,
+    public readonly stage: PaymentFailureStage,
     message: string,
     options?: ErrorOptions,
   ) {
@@ -68,136 +85,72 @@ export class X402PaymentError extends Error {
 }
 
 export interface AgentFetchConfig {
-  privateKey: Hex;
-  rpcUrl: string;
-  maxPaymentUsdc?: string;
-  confirmations?: number;
-  paymentVerificationRetries?: number;
-  paymentVerificationRetryDelayMs?: number;
-  authorizePayment?: (
+  readonly signer: ClientEvmSigner;
+  readonly networks: readonly [AgentPayNetwork, ...AgentPayNetwork[]];
+  readonly maxPaymentUsdc: string;
+  readonly authorizePayment?: (
     context: PaymentAuthorizationContext,
   ) => boolean | Promise<boolean>;
-  onTransactionSubmitted?: (
-    context: PaymentTransactionContext,
-  ) => void | Promise<void>;
+  readonly paymentIdFactory?: (request: Request) => string;
+  readonly onPaymentEvent?: (event: PaymentEvent) => void | Promise<void>;
 }
 
 export type AgentFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
-export interface PaymentRuntime {
-  getChainId(): Promise<number>;
-  transferUsdc(input: { token: Address; to: Address; amount: bigint }): Promise<Hash>;
-  waitForReceipt(
-    hash: Hash,
-    confirmations: number,
-  ): Promise<{ status: "success" | "reverted" }>;
+interface AgentFetchDependencies {
+  readonly fetch: typeof globalThis.fetch;
 }
-
-export interface AgentFetchDependencies {
-  fetch: typeof globalThis.fetch;
-  createPaymentRuntime(input: {
-    privateKey: Hex;
-    rpcUrl: string;
-    chainId: PaymentChainId;
-  }): PaymentRuntime;
-}
-
-export const USDC_BASE: Address = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-export const USDC_BASE_SEPOLIA: Address = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
-
-const baseNetworks: Readonly<Record<PaymentChainId, PaymentNetwork>> = {
-  8453: "base",
-  84532: "base-sepolia",
-};
-const usdcAddresses: Readonly<Record<PaymentChainId, Address>> = {
-  8453: USDC_BASE,
-  84532: USDC_BASE_SEPOLIA,
-};
-const transferAbi = parseAbi([
-  "function transfer(address to, uint256 value) returns (bool)",
-]);
-const usdcPricePattern = /^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/;
-const PAYMENT_HEADER = "X-Payment-Tx";
 
 const defaultDependencies: AgentFetchDependencies = {
   fetch: (...args) => globalThis.fetch(...args),
-  createPaymentRuntime: ({ privateKey, rpcUrl, chainId }) => {
-    const chain = chainId === 8453 ? base : baseSepolia;
-    const account = privateKeyToAccount(privateKey);
-    const transport = http(rpcUrl);
-    const publicClient = createPublicClient({ chain, transport });
-    const walletClient = createWalletClient({ account, chain, transport });
-
-    return {
-      getChainId: () => publicClient.getChainId(),
-      transferUsdc: ({ token, to, amount }) => walletClient.writeContract({
-        address: token,
-        abi: transferAbi,
-        functionName: "transfer",
-        args: [to, amount],
-      }),
-      waitForReceipt: async (hash, confirmations) => {
-        const receipt = await publicClient.waitForTransactionReceipt({ hash, confirmations });
-        return { status: receipt.status };
-      },
-    };
-  },
 };
 
-function parsePositiveUsdc(value: unknown): bigint | undefined {
-  if (typeof value !== "string" || !usdcPricePattern.test(value)) return undefined;
+const usdcPricePattern = /^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/;
+const networkDetails: Readonly<Record<AgentPayNetwork, {
+  chainId: PaymentChainId;
+  token: Address;
+}>> = {
+  "eip155:8453": { chainId: 8453, token: USDC_BASE },
+  "eip155:84532": { chainId: 84532, token: USDC_BASE_SEPOLIA },
+};
 
+function positiveUsdc(value: string, field: string): bigint {
+  if (!usdcPricePattern.test(value)) {
+    throw new RangeError(`${field} must be a positive USDC amount with at most six decimals.`);
+  }
   const amount = parseUnits(value, 6);
-  return amount > 0n ? amount : undefined;
+  if (amount <= 0n) {
+    throw new RangeError(`${field} must be greater than zero.`);
+  }
+  return amount;
 }
 
-function validateConfig(config: AgentFetchConfig): {
-  cap: bigint;
-  paymentVerificationRetries: number;
-  paymentVerificationRetryDelayMs: number;
-} {
-  privateKeyToAccount(config.privateKey);
-
-  let rpcUrl: URL;
+function validateConfig(config: AgentFetchConfig): { cap: bigint; networks: AgentPayNetwork[] } {
+  if (!config.signer || typeof config.signer.signTypedData !== "function") {
+    throw new TypeError("signer must implement ClientEvmSigner.");
+  }
   try {
-    rpcUrl = new URL(config.rpcUrl);
-  } catch {
-    throw new TypeError("rpcUrl must be a valid HTTP(S) URL.");
-  }
-  if (rpcUrl.protocol !== "http:" && rpcUrl.protocol !== "https:") {
-    throw new TypeError("rpcUrl must use HTTP or HTTPS.");
+    getAddress(config.signer.address);
+  } catch (cause) {
+    throw new TypeError("signer.address must be a valid EVM address.", { cause });
   }
 
-  const cap = parsePositiveUsdc(config.maxPaymentUsdc ?? "1.00");
-  if (cap === undefined) throw new RangeError("maxPaymentUsdc must be a positive USDC amount.");
-
-  const confirmations = config.confirmations ?? 1;
-  if (!Number.isInteger(confirmations) || confirmations <= 0) {
-    throw new RangeError("confirmations must be a positive integer.");
+  if (!Array.isArray(config.networks) || config.networks.length === 0) {
+    throw new RangeError("networks must contain at least one supported CAIP-2 network.");
+  }
+  const networks: AgentPayNetwork[] = [];
+  for (const network of config.networks) {
+    if (!(network in networkDetails)) {
+      throw new RangeError(`Unsupported AgentPay network: ${String(network)}.`);
+    }
+    if (!networks.includes(network)) networks.push(network);
   }
 
-  const paymentVerificationRetries = nonNegativeInteger(
-    config.paymentVerificationRetries,
-    "paymentVerificationRetries",
-  );
-  const paymentVerificationRetryDelayMs = nonNegativeInteger(
-    config.paymentVerificationRetryDelayMs,
-    "paymentVerificationRetryDelayMs",
-  );
-
-  return { cap, paymentVerificationRetries, paymentVerificationRetryDelayMs };
+  return { cap: positiveUsdc(config.maxPaymentUsdc, "maxPaymentUsdc"), networks };
 }
 
-function nonNegativeInteger(value: unknown, name: string): number {
-  if (value === undefined) return 0;
-  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
-    throw new RangeError(`${name} must be a non-negative integer.`);
-  }
-  return value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 function protocolError(
@@ -208,184 +161,229 @@ function protocolError(
   return new X402ProtocolError(code, message, options);
 }
 
-interface PaymentRequirement {
-  chainId: PaymentChainId;
-  network: PaymentNetwork;
-  payTo: Address;
-  priceUsdc: string;
-  amount: bigint;
-}
-
-function validatePaymentRequirement(value: unknown, cap: bigint): PaymentRequirement {
-  if (!isRecord(value)
-    || value.error !== "Payment Required"
-    || typeof value.priceUsdc !== "string"
-    || typeof value.payTo !== "string"
-    || typeof value.network !== "string"
-    || typeof value.chainId !== "number") {
-    throw protocolError("invalid_payment_response", "Invalid HTTP 402 payment response.");
+function authorizationContext(
+  requestUrl: string,
+  paymentId: string,
+  selected: PaymentRequirements,
+): PaymentAuthorizationContext {
+  if (selected.scheme !== "exact") {
+    throw protocolError("unsupported_scheme", "AgentPay only authorizes the x402 exact scheme.");
   }
+  if (!(selected.network in networkDetails)) {
+    throw protocolError("unsupported_network", `Unsupported x402 network: ${selected.network}.`);
+  }
+  const network = selected.network as AgentPayNetwork;
+  const { chainId, token } = networkDetails[network];
 
-  let payTo: Address;
+  let asset: Address;
+  let recipient: Address;
   try {
-    payTo = getAddress(value.payTo);
+    asset = getAddress(selected.asset);
+    recipient = getAddress(selected.payTo);
   } catch (cause) {
-    throw protocolError("invalid_payment_response", "Invalid HTTP 402 payment recipient.", { cause });
+    throw protocolError(
+      "invalid_payment_response",
+      "The x402 payment requirement contains an invalid EVM address.",
+      { cause },
+    );
   }
-  if (value.chainId !== 8453 && value.chainId !== 84532) {
-    throw protocolError("unsupported_chain", "HTTP 402 payment response specifies an unsupported chain.");
-  }
-
-  if (value.network !== baseNetworks[value.chainId]) {
-    throw protocolError("network_mismatch", "HTTP 402 payment response network does not match its chain.");
-  }
-
-  const price = parsePositiveUsdc(value.priceUsdc);
-  if (price === undefined) {
-    throw protocolError("invalid_payment_response", "HTTP 402 payment response has an invalid USDC price.");
-  }
-  if (price > cap) {
-    throw protocolError("payment_limit_exceeded", "HTTP 402 payment exceeds maxPaymentUsdc.");
+  if (asset !== token) {
+    throw protocolError(
+      "unsupported_asset",
+      `AgentPay only supports official USDC on ${network}.`,
+    );
   }
 
+  let amount: bigint;
+  try {
+    amount = BigInt(selected.amount);
+  } catch (cause) {
+    throw protocolError(
+      "invalid_payment_response",
+      "The x402 payment requirement contains an invalid amount.",
+      { cause },
+    );
+  }
+  if (amount <= 0n) {
+    throw protocolError("invalid_payment_response", "The x402 payment amount must be positive.");
+  }
   return {
-    chainId: value.chainId,
-    network: value.network,
-    payTo,
-    priceUsdc: value.priceUsdc,
-    amount: price,
+    requestUrl,
+    paymentId,
+    scheme: "exact",
+    network,
+    chainId,
+    recipient,
+    token,
+    priceUsdc: formatUnits(amount, 6),
+    amount,
   };
 }
 
-async function paymentRequirementFrom(response: Response): Promise<unknown> {
-  try {
-    return await response.clone().json();
-  } catch (cause) {
-    throw protocolError("invalid_payment_response", "HTTP 402 payment response is not valid JSON.", { cause });
-  }
-}
-
-async function isTemporaryPaymentVerificationFailure(response: Response): Promise<boolean> {
-  if (response.status !== 503) return false;
-  try {
-    const body: unknown = await response.clone().json();
-    return isRecord(body) && body.error === "Payment Verification Unavailable";
-  } catch {
-    return false;
-  }
-}
-
-function wait(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+function paymentErrorFor(stage: PaymentFailureStage, cause: Error): X402PaymentError {
+  const code: PaymentErrorCode = stage === "verify"
+    ? "payment_verification_failed"
+    : stage === "settle"
+      ? "payment_settlement_failed"
+      : stage === "sign"
+        ? "payment_creation_failed"
+        : "payment_failed";
+  return new X402PaymentError(code, stage, `x402 payment failed during ${stage}.`, { cause });
 }
 
 export function createAgentFetch(
   config: AgentFetchConfig,
   dependencies: AgentFetchDependencies = defaultDependencies,
 ): AgentFetch {
-  const { cap, paymentVerificationRetries, paymentVerificationRetryDelayMs } = validateConfig(config);
-  const confirmations = config.confirmations ?? 1;
+  const { cap, networks } = validateConfig(config);
+
+  const emit = async (event: PaymentEvent): Promise<void> => {
+    try {
+      await config.onPaymentEvent?.(event);
+    } catch {
+      // Observability is intentionally best-effort and must never change payment behavior.
+    }
+  };
 
   return async (input, init) => {
     const request = new Request(input, init);
-    const response = await dependencies.fetch(request.clone());
-    if (response.status !== 402) return response;
+    let stage: PaymentFailureStage = "error";
+    let paymentId: string | undefined;
+    let context: PaymentAuthorizationContext | undefined;
+    let terminalError: Error | undefined;
+    let failureReported = false;
 
-    const requirement = validatePaymentRequirement(await paymentRequirementFrom(response), cap);
-    const token = usdcAddresses[requirement.chainId];
-    const authorizationContext: PaymentAuthorizationContext = {
-      requestUrl: request.url,
-      chainId: requirement.chainId,
-      network: requirement.network,
-      payTo: requirement.payTo,
-      token,
-      priceUsdc: requirement.priceUsdc,
-      amount: requirement.amount,
+    const reportFailure = async (error: Error, failedStage = stage): Promise<void> => {
+      if (failureReported) return;
+      failureReported = true;
+      await emit({
+        type: "payment_failed",
+        requestUrl: request.url,
+        ...(paymentId === undefined ? {} : { paymentId }),
+        stage: failedStage,
+        error,
+      });
     };
 
-    if (config.authorizePayment !== undefined) {
-      let authorized: boolean;
-      try {
-        authorized = await config.authorizePayment(authorizationContext);
-      } catch (cause) {
-        throw protocolError(
-          "payment_not_authorized",
-          "HTTP 402 payment authorization failed.",
-          { cause },
-        );
-      }
-      if (!authorized) {
-        throw protocolError(
-          "payment_not_authorized",
-          "HTTP 402 payment was not authorized.",
-        );
-      }
+    const client = new x402Client();
+    for (const network of networks) {
+      client.register(network, new ExactEvmScheme(config.signer));
     }
 
-    const runtime = dependencies.createPaymentRuntime({
-      privateKey: config.privateKey,
-      rpcUrl: config.rpcUrl,
-      chainId: requirement.chainId,
+    client.onBeforePaymentCreation(async ({ selectedRequirements }: PaymentCreationContext) => {
+      stage = "parse";
+      try {
+        paymentId ??= config.paymentIdFactory?.(request.clone()) ?? generatePaymentId();
+        if (!isValidPaymentId(paymentId)) {
+          throw protocolError(
+            "invalid_payment_response",
+            "paymentIdFactory returned an invalid Payment Identifier.",
+          );
+        }
+        context = authorizationContext(request.url, paymentId, selectedRequirements);
+      } catch (error) {
+        terminalError = asError(error);
+        await reportFailure(terminalError, "parse");
+        throw terminalError;
+      }
+
+      await emit({ type: "payment_required", context });
+      stage = "policy";
+      if (context.amount > cap) {
+        terminalError = protocolError(
+          "payment_limit_exceeded",
+          "The x402 payment exceeds maxPaymentUsdc.",
+        );
+        await reportFailure(terminalError, "policy");
+        throw terminalError;
+      }
+      if (config.authorizePayment !== undefined) {
+        let authorized: boolean;
+        try {
+          authorized = await config.authorizePayment(context);
+        } catch (cause) {
+          terminalError = protocolError(
+            "payment_not_authorized",
+            "x402 payment authorization failed closed.",
+            { cause },
+          );
+          await reportFailure(terminalError, "policy");
+          throw terminalError;
+        }
+        if (!authorized) {
+          terminalError = protocolError(
+            "payment_not_authorized",
+            "x402 payment was not authorized.",
+          );
+          await reportFailure(terminalError, "policy");
+          throw terminalError;
+        }
+      }
+
+      await emit({ type: "payment_authorized", context });
+      stage = "sign";
     });
 
-    let rpcChainId: number;
-    try {
-      rpcChainId = await runtime.getChainId();
-    } catch (cause) {
-      throw new X402PaymentError("transfer_failed", "Could not determine the RPC chain ID.", { cause });
-    }
-    if (rpcChainId !== requirement.chainId) {
-      throw new X402PaymentError("rpc_chain_mismatch", "RPC chain ID does not match the payment requirement.");
-    }
+    client.registerExtension({
+      key: PAYMENT_IDENTIFIER,
+      enrichPaymentPayload: async (payload: PaymentPayload) => {
+        if (paymentId === undefined) return payload;
+        const extensions = payload.extensions ?? {};
+        appendPaymentIdentifierToExtensions(extensions, paymentId);
+        return { ...payload, extensions };
+      },
+    });
 
-    let hash: Hash;
-    try {
-      hash = await runtime.transferUsdc({
-        token,
-        to: requirement.payTo,
-        amount: requirement.amount,
-      });
-    } catch (cause) {
-      throw new X402PaymentError("transfer_failed", "USDC transfer failed.", { cause });
-    }
+    client.onPaymentCreationFailure(async ({ error }) => {
+      terminalError = paymentErrorFor("sign", error);
+      await reportFailure(terminalError, "sign");
+    });
 
-    if (config.onTransactionSubmitted !== undefined) {
-      try {
-        await config.onTransactionSubmitted({
-          hash,
-          chainId: requirement.chainId,
-          token,
-          payTo: requirement.payTo,
-          amount: requirement.amount,
-        });
-      } catch {
-        // Observability must not interrupt confirmation after funds were submitted.
+    client.onAfterPaymentCreation(async () => {
+      stage = "verify";
+    });
+
+    client.onPaymentResponse(async (result: PaymentResponseContext) => {
+      if (result.settleResponse?.success) {
+        stage = "settle";
+        if (context !== undefined) {
+          await emit({
+            type: "payment_settled",
+            context,
+            transaction: result.settleResponse.transaction,
+          });
+        }
+        return;
       }
-    }
 
-    let receipt: { status: "success" | "reverted" };
+      const failedStage: PaymentFailureStage = result.paymentRequired
+        ? "verify"
+        : result.settleResponse
+          ? "settle"
+          : "error";
+      const error = result.error ?? new Error(
+        result.settleResponse?.errorMessage
+          ?? result.settleResponse?.errorReason
+          ?? result.paymentRequired?.error
+          ?? `Paid request did not include a successful PAYMENT-RESPONSE header.`,
+      );
+      await reportFailure(error, failedStage);
+    });
+
     try {
-      receipt = await runtime.waitForReceipt(hash, confirmations);
-    } catch (cause) {
-      throw new X402PaymentError("transfer_failed", "USDC transfer confirmation failed.", { cause });
+      const trackedFetch: typeof globalThis.fetch = async (...args) => {
+        const response = await dependencies.fetch(...args);
+        if (stage === "error" && response.status === 402) stage = "parse";
+        return response;
+      };
+      const fetchWithPayment = wrapFetchWithPayment(trackedFetch, client);
+      return await fetchWithPayment(request.clone());
+    } catch (error) {
+      const cause = terminalError ?? asError(error);
+      await reportFailure(cause);
+      if (terminalError !== undefined) throw terminalError;
+      if (cause instanceof X402ProtocolError || cause instanceof X402PaymentError) throw cause;
+      throw paymentErrorFor(stage, cause);
     }
-    if (receipt.status === "reverted") {
-      throw new X402PaymentError("transaction_failed", "USDC transfer transaction reverted.");
-    }
-
-    const retryRequest = request.clone();
-    const retryHeaders = new Headers(retryRequest.headers);
-    retryHeaders.set(PAYMENT_HEADER, hash);
-    let retryResponse = await dependencies.fetch(new Request(retryRequest.clone(), {
-      headers: retryHeaders,
-    }));
-    for (let attempt = 0; attempt < paymentVerificationRetries; attempt += 1) {
-      if (!await isTemporaryPaymentVerificationFailure(retryResponse)) return retryResponse;
-      if (paymentVerificationRetryDelayMs > 0) await wait(paymentVerificationRetryDelayMs);
-      retryResponse = await dependencies.fetch(new Request(retryRequest.clone(), {
-        headers: retryHeaders,
-      }));
-    }
-    return retryResponse;
   };
 }

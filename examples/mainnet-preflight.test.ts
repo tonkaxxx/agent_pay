@@ -2,7 +2,7 @@ import type { Address } from "viem";
 import { describe, expect, test, vi } from "vitest";
 import { base } from "viem/chains";
 
-import { USDC_BASE, type PaymentAuthorizationContext } from "@x402/client";
+import { USDC_BASE, type PaymentAuthorizationContext } from "@agentpay/client";
 
 import {
   MainnetPreflightError,
@@ -26,9 +26,11 @@ const agentAddress = "0x2222222222222222222222222222222222222222" as Address;
 const payTo = "0x1111111111111111111111111111111111111111" as Address;
 const context: PaymentAuthorizationContext = {
   requestUrl: "http://127.0.0.1:3000/api/data",
+  paymentId: "pay_agentpay_mainnet_1234",
+  scheme: "exact",
   chainId: 8453,
-  network: "base",
-  payTo,
+  network: "eip155:8453",
+  recipient: payTo,
   token: USDC_BASE,
   priceUsdc: "0.01",
   amount: 10_000n,
@@ -114,8 +116,8 @@ describe("authorizeMainnetPayment", () => {
   test.each([
     ["request URL", { requestUrl: "http://127.0.0.1:3000/other" }],
     ["chain", { chainId: 84532 }],
-    ["network", { network: "base-sepolia" }],
-    ["recipient", { payTo: "0x3333333333333333333333333333333333333333" }],
+    ["network", { network: "eip155:84532" }],
+    ["recipient", { recipient: "0x3333333333333333333333333333333333333333" }],
     ["token", { token: "0x4444444444444444444444444444444444444444" }],
     ["price string", { priceUsdc: "0.010" }],
     ["amount", { amount: 10_001n }],

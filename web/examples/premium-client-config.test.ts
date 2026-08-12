@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { USDC_BASE, type PaymentAuthorizationContext } from "@x402/client";
+import { USDC_BASE, type PaymentAuthorizationContext } from "@agentpay/client";
 
 import {
   authorizePremiumPayment,
@@ -13,7 +13,6 @@ const payTo = "0x1111111111111111111111111111111111111111";
 
 const environment = {
   AGENT_PRIVATE_KEY: privateKey,
-  BASE_MAINNET_RPC_URL: "https://mainnet.base.org",
   AGENTPAY_API_URL: "https://agentpay.example/api/premium",
   AGENTPAY_EXPECTED_PAY_TO: payTo,
   ALLOW_MAINNET_PAYMENTS: "false",
@@ -21,9 +20,11 @@ const environment = {
 
 const payment: PaymentAuthorizationContext = {
   requestUrl: environment.AGENTPAY_API_URL,
+  paymentId: "pay_agentpay_web_12345",
+  scheme: "exact",
   chainId: 8453,
-  network: "base",
-  payTo,
+  network: "eip155:8453",
+  recipient: payTo,
   token: USDC_BASE,
   priceUsdc: "0.01",
   amount: 10_000n,
@@ -33,7 +34,6 @@ describe("loadPremiumClientConfig", () => {
   test("loads and normalizes the pinned mainnet boundaries", () => {
     expect(loadPremiumClientConfig(environment)).toEqual({
       privateKey,
-      rpcUrl: "https://mainnet.base.org/",
       apiUrl: environment.AGENTPAY_API_URL,
       expectedPayTo: payTo,
       mainnetAllowed: false,
@@ -42,7 +42,6 @@ describe("loadPremiumClientConfig", () => {
 
   test.each([
     ["AGENT_PRIVATE_KEY", "0x1234", "32-byte"],
-    ["BASE_MAINNET_RPC_URL", "ftp://rpc.example", "HTTP or HTTPS"],
     ["AGENTPAY_API_URL", "not-a-url", "valid URL"],
     ["AGENTPAY_EXPECTED_PAY_TO", "0x1234", "20-byte"],
   ] as const)("fails closed for an invalid %s", (name, value, message) => {
@@ -78,8 +77,8 @@ describe("authorizePremiumPayment", () => {
   test.each([
     ["requestUrl", "https://evil.example/api/premium"],
     ["chainId", 84532],
-    ["network", "base-sepolia"],
-    ["payTo", "0x2222222222222222222222222222222222222222"],
+    ["network", "eip155:84532"],
+    ["recipient", "0x2222222222222222222222222222222222222222"],
     ["token", "0x2222222222222222222222222222222222222222"],
     ["priceUsdc", "0.02"],
     ["amount", 20_000n],

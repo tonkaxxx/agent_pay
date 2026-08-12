@@ -8,7 +8,7 @@ import {
   USDC_BASE_SEPOLIA,
   X402ProtocolError,
   type AgentFetchConfig,
-} from "@x402/client";
+} from "@agentpay/client";
 
 import {
   DEMO_PRICE_USDC,
@@ -47,25 +47,23 @@ export async function runAgentDemo(
   const vendorApiUrl = vendorApiUrlFromEnvironment(environment, env);
   let successfulPreview = false;
 
+  const signer = privateKeyToAccount(privateKey);
   let agentFetchConfig: AgentFetchConfig = {
-    privateKey,
-    rpcUrl: environment.rpcUrl,
+    signer,
+    networks: [environment.network.network],
     maxPaymentUsdc: "0.10",
     authorizePayment: (context) => context.chainId === 84532
-      && context.network === "base-sepolia"
+      && context.network === "eip155:84532"
       && context.token === USDC_BASE_SEPOLIA,
   };
 
   if (environment.network.realFunds) {
-    const agentAddress = privateKeyToAccount(privateKey).address;
+    const agentAddress = signer.address;
     const runtime = dependencies.createMainnetPreflightRuntime(environment.rpcUrl);
     agentFetchConfig = {
-      privateKey,
-      rpcUrl: environment.rpcUrl,
+      signer,
+      networks: [environment.network.network],
       maxPaymentUsdc: DEMO_PRICE_USDC,
-      confirmations: 2,
-      paymentVerificationRetries: 3,
-      paymentVerificationRetryDelayMs: 1_000,
       authorizePayment: async (context) => {
         const authorized = await authorizeMainnetPayment({
           context,
@@ -80,10 +78,11 @@ export async function runAgentDemo(
         if (!authorized) successfulPreview = true;
         return authorized;
       },
-      onTransactionSubmitted: ({ hash }) => {
-        dependencies.log(`Transaction submitted: ${hash}`);
-        dependencies.log(`Explorer: ${environment.network.explorerUrl}/tx/${hash}`);
-        dependencies.log("WARNING: PAYMENT SUBMITTED. DO NOT RERUN THIS COMMAND.");
+      onPaymentEvent: (event) => {
+        if (event.type !== "payment_settled") return;
+        dependencies.log(`Transaction settled: ${event.transaction}`);
+        dependencies.log(`Explorer: ${environment.network.explorerUrl}/tx/${event.transaction}`);
+        dependencies.log("WARNING: PAYMENT SETTLED. DO NOT RERUN THIS COMMAND.");
       },
     };
   }

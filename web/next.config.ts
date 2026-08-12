@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  transpilePackages: ["@x402/server", "@x402/client"],
+  transpilePackages: ["@agentpay/server", "@agentpay/client"],
   typedRoutes: true,
   headers: async () => [{
     source: "/:path*",
