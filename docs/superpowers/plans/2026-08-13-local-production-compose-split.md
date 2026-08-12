@@ -130,7 +130,7 @@ services:
       context: ..
       dockerfile: web/Dockerfile
       target: builder
-    command: [node, web/node_modules/next/dist/bin/next, dev, web, --hostname, 0.0.0.0, --port, "3000"]
+    command: [node, /app/web/node_modules/next/dist/bin/next, dev, /app/web, --hostname, 0.0.0.0, --port, "3000"]
     env_file: [.env.local]
     environment:
       NODE_ENV: development

@@ -89,6 +89,19 @@ describe("local Compose", () => {
     expect(model.networks ?? {}).not.toHaveProperty("web-net");
   });
 
+  test("starts Next independently of an existing image working directory", () => {
+    expect(model.services.web?.command).toEqual([
+      "node",
+      "/app/web/node_modules/next/dist/bin/next",
+      "dev",
+      "/app/web",
+      "--hostname",
+      "0.0.0.0",
+      "--port",
+      "3000",
+    ]);
+  });
+
   test("keeps Redis private, healthy, and persistent", () => {
     const redis = model.services.redis!;
 

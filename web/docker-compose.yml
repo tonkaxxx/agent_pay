@@ -6,9 +6,9 @@ services:
       target: builder
     command:
       - node
-      - web/node_modules/next/dist/bin/next
+      - /app/web/node_modules/next/dist/bin/next
       - dev
-      - web
+      - /app/web
       - --hostname
       - 0.0.0.0
       - --port
