@@ -13,7 +13,9 @@ let handler: Promise<PremiumRequestHandler> | undefined;
 
 function configuredHandler(): Promise<PremiumRequestHandler> {
   handler ??= Promise.resolve()
-    .then(() => buildPremiumHandler(loadPremiumConfig(process.env)))
+    .then(() => buildPremiumHandler(loadPremiumConfig(process.env, {
+      production: process.env.NODE_ENV === "production",
+    })))
     .catch(cause => {
       handler = undefined;
       throw new PremiumConfigurationError({ cause });

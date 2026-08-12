@@ -2,6 +2,10 @@ import { getAddress, type Address } from "viem";
 
 type PremiumEnvironment = Readonly<Record<string, string | undefined>>;
 
+interface LoadPremiumConfigOptions {
+  readonly production?: boolean;
+}
+
 export interface PremiumConfig {
   readonly siteUrl: string;
   readonly payTo: Address;
@@ -45,7 +49,36 @@ function redisUrl(value: string): string {
   return url.href;
 }
 
-export function loadPremiumConfig(environment: PremiumEnvironment): PremiumConfig {
+function assertProductionConfig(
+  environment: PremiumEnvironment,
+  config: PremiumConfig,
+): void {
+  const siteUrl = new URL(config.siteUrl);
+  const loopback = siteUrl.hostname === "localhost"
+    || siteUrl.hostname.endsWith(".localhost")
+    || siteUrl.hostname === "[::1]"
+    || /^127(?:\.\d{1,3}){3}$/.test(siteUrl.hostname);
+  if (siteUrl.protocol !== "https:" || loopback) {
+    throw new Error("NEXT_PUBLIC_SITE_URL must use a public HTTPS origin in production.");
+  }
+  if (config.payTo.toLowerCase() === "0x1111111111111111111111111111111111111111") {
+    throw new Error("AGENTPAY_PAY_TO must not use the placeholder recipient in production.");
+  }
+  if (config.offlineQuoteOnly) {
+    throw new Error("AGENTPAY_OFFLINE_QUOTE_ONLY must not be enabled in production.");
+  }
+  if (environment.AGENT_PRIVATE_KEY?.trim()) {
+    throw new Error("AGENT_PRIVATE_KEY must not be present in the production web environment.");
+  }
+  if (new URL(config.redisUrl).password === "") {
+    throw new Error("REDIS_URL must include authentication in production.");
+  }
+}
+
+export function loadPremiumConfig(
+  environment: PremiumEnvironment,
+  { production = false }: LoadPremiumConfigOptions = {},
+): PremiumConfig {
   let payTo: Address;
   try {
     payTo = getAddress(required(environment, "AGENTPAY_PAY_TO"));
@@ -54,7 +87,7 @@ export function loadPremiumConfig(environment: PremiumEnvironment): PremiumConfi
     throw new Error("AGENTPAY_PAY_TO must be a valid EVM address.");
   }
 
-  return {
+  const config = {
     siteUrl: httpUrl(
       required(environment, "NEXT_PUBLIC_SITE_URL"),
       "NEXT_PUBLIC_SITE_URL",
@@ -65,4 +98,6 @@ export function loadPremiumConfig(environment: PremiumEnvironment): PremiumConfi
     cdpApiKeySecret: required(environment, "CDP_API_KEY_SECRET"),
     offlineQuoteOnly: environment.AGENTPAY_OFFLINE_QUOTE_ONLY === "true",
   };
+  if (production) assertProductionConfig(environment, config);
+  return config;
 }
