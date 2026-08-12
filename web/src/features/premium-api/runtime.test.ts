@@ -46,7 +46,7 @@ test("builds the paid handler with CDP, exact Base USDC, discovery, and outer id
     network: "eip155:8453",
     priceUsdc: "0.01",
     payTo: config.payTo,
-    paymentIdentifier: "optional",
+    paymentIdentifier: "required",
     discovery: { outputExample: expect.objectContaining({ protocol: "x402-v2" }) },
   }));
   expect(protect).toHaveBeenCalledWith(expect.any(Function), { accepts: {} }, resourceServer);

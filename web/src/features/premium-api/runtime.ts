@@ -17,6 +17,7 @@ import type { NextRequest } from "next/server";
 
 import type { PremiumConfig } from "./config";
 import { createPremiumHandler } from "./handler";
+import { withReadablePaymentRequired } from "./payment-required-response";
 
 interface PremiumRuntimeDependencies {
   createFacilitator(config: PremiumConfig): FacilitatorClient;
@@ -68,7 +69,7 @@ export function buildPremiumHandler(
     payTo: config.payTo,
     description: "AgentPay premium API",
     mimeType: "application/json",
-    paymentIdentifier: "optional",
+    paymentIdentifier: "required",
     discovery: {
       outputExample: {
         premiumData: "Here's your premium data — paid, verified, and unlocked by AgentPay.",
@@ -83,9 +84,10 @@ export function buildPremiumHandler(
     dependencies.createRedisClient(config.redisUrl),
   );
 
-  return withPaymentIdempotency(paidHandler, {
+  const idempotentHandler = withPaymentIdempotency(paidHandler, {
     store,
     pendingTtlSeconds: 60,
     completedTtlSeconds: 3_600,
   });
+  return withReadablePaymentRequired(idempotentHandler);
 }
