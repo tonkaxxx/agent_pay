@@ -297,7 +297,7 @@ Expected: every command exits `0`.
 - [ ] **Step 3: Build and push the immutable runner image**
 
 ```sh
-docker build --target runner \
+docker build -f web/Dockerfile --target runner \
   --label "org.opencontainers.image.revision=$AGENTPAY_RELEASE_SHA" \
   -t "tonkaxxx/agentpay:$AGENTPAY_RELEASE_SHA" .
 docker push "tonkaxxx/agentpay:$AGENTPAY_RELEASE_SHA"
