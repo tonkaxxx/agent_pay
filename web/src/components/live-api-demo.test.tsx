@@ -9,7 +9,7 @@ import { LiveApiDemo } from "./live-api-demo";
 afterEach(() => vi.unstubAllGlobals());
 
 test("calls the real endpoint and renders its HTTP 402 requirements", async () => {
-  const payload: PaymentRequired = {
+  const paymentRequired: PaymentRequired = {
     x402Version: 2,
     resource: { url: "https://agentpay.example/api/premium", description: "Premium" },
     accepts: [{
@@ -22,9 +22,16 @@ test("calls the real endpoint and renders its HTTP 402 requirements", async () =
       extra: { name: "USD Coin", version: "2" },
     }],
   };
-  const fetch = vi.fn().mockResolvedValue(new Response("{}", {
+  const legacyQuote = {
+    error: "Payment Required",
+    priceUsdc: "0.01",
+    payTo: "0x1111111111111111111111111111111111111111",
+    network: "base",
+    chainId: 8453,
+  };
+  const fetch = vi.fn().mockResolvedValue(Response.json(legacyQuote, {
     status: 402,
-    headers: { "PAYMENT-REQUIRED": encodePaymentRequiredHeader(payload) },
+    headers: { "PAYMENT-REQUIRED": encodePaymentRequiredHeader(paymentRequired) },
   }));
   vi.stubGlobal("fetch", fetch);
   const user = userEvent.setup();
@@ -38,7 +45,10 @@ test("calls the real endpoint and renders its HTTP 402 requirements", async () =
     headers: { Accept: "application/json" },
   });
   expect(await screen.findAllByText("402 Payment Required")).toHaveLength(2);
-  expect(screen.getByText(/"amount": "10000"/)).toBeInTheDocument();
+  expect(screen.getByText(/"priceUsdc": "0.01"/)).toBeInTheDocument();
+  expect(screen.getByText(/"chainId": 8453/)).toBeInTheDocument();
+  expect(screen.queryByText(/"x402Version"/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/premiumData/)).not.toBeInTheDocument();
   expect(screen.getByText(/real funds/i)).toBeInTheDocument();
   expect(screen.getByRole("link", { name: /complete the paid request/i })).toHaveAttribute(
     "href",

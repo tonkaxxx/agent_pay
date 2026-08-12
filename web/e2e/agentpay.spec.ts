@@ -15,8 +15,9 @@ test("presents the investor story and exposes the live payment quote", async ({ 
   await page.getByRole("tab", { name: /api\/premium/i }).click();
   await page.getByRole("button", { name: /call live endpoint/i }).click();
   await expect(page.locator(".response-line")).toHaveText(/402 Payment Required/);
-  await expect(page.locator(".api-console pre")).toContainText('"amount": "10000"');
-  await expect(page.locator(".api-console pre")).toContainText('"network": "eip155:8453"');
+  await expect(page.locator(".api-console pre")).toContainText('"priceUsdc": "0.01"');
+  await expect(page.locator(".api-console pre")).toContainText('"chainId": 8453');
+  await expect(page.locator(".api-console pre")).not.toContainText("premiumData");
 
   const hasHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -31,7 +32,13 @@ test("the actual API route publishes exact Base Mainnet requirements", async ({ 
   const encoded = response.headers()["payment-required"];
   expect(encoded).toBeTruthy();
   const decoded = decodePaymentRequiredHeader(encoded!);
-  expect(await response.json()).toEqual(decoded);
+  expect(await response.json()).toEqual({
+    error: "Payment Required",
+    priceUsdc: "0.01",
+    payTo: "0x1111111111111111111111111111111111111111",
+    network: "base",
+    chainId: 8453,
+  });
   expect(decoded).toMatchObject({
     x402Version: 2,
     accepts: [{
@@ -46,6 +53,8 @@ test("the actual API route publishes exact Base Mainnet requirements", async ({ 
       },
     },
   });
+  expect(decoded.extensions).not.toHaveProperty("bazaar");
+  expect(JSON.stringify(decoded)).not.toContain("premiumData");
 });
 
 test("documents the 402 payment gate", async ({ page }) => {
