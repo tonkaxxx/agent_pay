@@ -17,7 +17,7 @@ import type { NextRequest } from "next/server";
 
 import type { PremiumConfig } from "./config";
 import { createPremiumHandler } from "./handler";
-import { withReadablePaymentRequired } from "./payment-required-response";
+import { withLegacyPaymentRequired } from "./payment-required-response";
 
 interface PremiumRuntimeDependencies {
   createFacilitator(config: PremiumConfig): FacilitatorClient;
@@ -71,14 +71,6 @@ export function buildPremiumHandler(
       description: "AgentPay premium API",
       mimeType: "application/json",
       paymentIdentifier: "required",
-      discovery: {
-        outputExample: {
-          premiumData: "Here's your premium data — paid, verified, and unlocked by AgentPay.",
-          paidWith: "USDC",
-          network: "eip155:8453",
-          protocol: "x402-v2",
-        },
-      },
     }),
     resource: new URL("/api/premium", config.siteUrl).href,
   } satisfies RouteConfig;
@@ -92,5 +84,10 @@ export function buildPremiumHandler(
     pendingTtlSeconds: 60,
     completedTtlSeconds: 3_600,
   });
-  return withReadablePaymentRequired(idempotentHandler);
+  return withLegacyPaymentRequired(idempotentHandler, {
+    priceUsdc: "0.01",
+    payTo: config.payTo,
+    network: "base",
+    chainId: 8453,
+  });
 }

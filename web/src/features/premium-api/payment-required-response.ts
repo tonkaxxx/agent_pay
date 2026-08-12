@@ -1,8 +1,16 @@
 import type { PaymentRequestHandler } from "@agentpay/server";
 import { decodePaymentRequiredHeader } from "@x402/core/http";
 
-export function withReadablePaymentRequired(
+export interface LegacyPaymentQuote {
+  readonly priceUsdc: string;
+  readonly payTo: string;
+  readonly network: "base";
+  readonly chainId: 8453;
+}
+
+export function withLegacyPaymentRequired(
   handler: PaymentRequestHandler,
+  quote: LegacyPaymentQuote,
 ): PaymentRequestHandler {
   return async request => {
     const response = await handler(request);
@@ -12,11 +20,14 @@ export function withReadablePaymentRequired(
     if (!encoded) return response;
 
     try {
-      const body = decodePaymentRequiredHeader(encoded);
+      decodePaymentRequiredHeader(encoded);
       const headers = new Headers(response.headers);
       headers.set("content-type", "application/json; charset=utf-8");
-      headers.set("cache-control", "private, no-store");
-      return new Response(JSON.stringify(body), { status: 402, headers });
+      headers.set("cache-control", "no-store");
+      return new Response(JSON.stringify({
+        error: "Payment Required",
+        ...quote,
+      }), { status: 402, headers });
     } catch {
       return response;
     }

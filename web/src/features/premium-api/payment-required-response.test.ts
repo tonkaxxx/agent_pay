@@ -1,11 +1,10 @@
 import {
-  decodePaymentRequiredHeader,
   encodePaymentRequiredHeader,
 } from "@x402/core/http";
 import type { PaymentRequired } from "@x402/core/types";
 import { expect, test, vi } from "vitest";
 
-import { withReadablePaymentRequired } from "./payment-required-response";
+import { withLegacyPaymentRequired } from "./payment-required-response";
 
 const paymentRequired: PaymentRequired = {
   x402Version: 2,
@@ -26,7 +25,14 @@ const paymentRequired: PaymentRequired = {
   extensions: {},
 };
 
-test("mirrors the official PAYMENT-REQUIRED header into the 402 JSON body", async () => {
+const legacyQuote = {
+  priceUsdc: "0.01",
+  payTo: "0x58B0fF9Fd53C854f3779acdE649a7FAc2de2d1CB",
+  network: "base",
+  chainId: 8453,
+} as const;
+
+test("returns the legacy quote body while preserving the official v2 header", async () => {
   const encoded = encodePaymentRequiredHeader(paymentRequired);
   const handler = vi.fn().mockResolvedValue(new Response("{}", {
     status: 402,
@@ -37,14 +43,17 @@ test("mirrors the official PAYMENT-REQUIRED header into the 402 JSON body", asyn
   }));
   const request = new Request("https://agentpay.example/api/premium");
 
-  const response = await withReadablePaymentRequired(handler)(request);
+  const response = await withLegacyPaymentRequired(handler, legacyQuote)(request);
 
   expect(response.status).toBe(402);
   expect(response.headers.get("payment-required")).toBe(encoded);
   expect(response.headers.get("x-upstream")).toBe("preserved");
-  expect(response.headers.get("cache-control")).toBe("private, no-store");
+  expect(response.headers.get("cache-control")).toBe("no-store");
   expect(response.headers.get("content-type")).toContain("application/json");
-  await expect(response.json()).resolves.toEqual(decodePaymentRequiredHeader(encoded));
+  await expect(response.json()).resolves.toEqual({
+    error: "Payment Required",
+    ...legacyQuote,
+  });
   expect(handler).toHaveBeenCalledWith(request);
 });
 
@@ -52,7 +61,7 @@ test("returns non-402 responses by identity", async () => {
   const upstream = Response.json({ premium: true });
   const handler = vi.fn().mockResolvedValue(upstream);
 
-  await expect(withReadablePaymentRequired(handler)(
+  await expect(withLegacyPaymentRequired(handler, legacyQuote)(
     new Request("https://agentpay.example/api/premium"),
   )).resolves.toBe(upstream);
 });
@@ -67,7 +76,7 @@ test.each([
   });
   const handler = vi.fn().mockResolvedValue(upstream);
 
-  await expect(withReadablePaymentRequired(handler)(
+  await expect(withLegacyPaymentRequired(handler, legacyQuote)(
     new Request("https://agentpay.example/api/premium"),
   )).resolves.toBe(upstream);
 });
