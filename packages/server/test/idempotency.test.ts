@@ -4,6 +4,7 @@ import { describe, expect, test, vi } from "vitest";
 
 import {
   InMemoryPaymentIdempotencyStore,
+  PaymentIdempotencyUnavailableError,
   RedisPaymentIdempotencyStore,
   withPaymentIdempotency,
   type PaymentIdempotencyStore,
@@ -257,6 +258,22 @@ describe("withPaymentIdempotency", () => {
         settlement,
       }),
     }));
+  });
+
+  test("fails closed with a safe typed error when the store is unavailable", async () => {
+    const handler = vi.fn().mockResolvedValue(paidResponse());
+    const store: PaymentIdempotencyStore = {
+      begin: vi.fn().mockRejectedValue(new Error("redis://:secret@redis:6379")),
+      complete: vi.fn(),
+      release: vi.fn(),
+    };
+    const wrapped = withPaymentIdempotency(handler, { store });
+
+    const operation = wrapped(paidRequest());
+
+    await expect(operation).rejects.toBeInstanceOf(PaymentIdempotencyUnavailableError);
+    await expect(operation).rejects.not.toThrow("secret");
+    expect(handler).not.toHaveBeenCalled();
   });
 });
 

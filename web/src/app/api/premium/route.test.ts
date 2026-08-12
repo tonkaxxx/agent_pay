@@ -19,5 +19,6 @@ test("fails closed without deployment configuration", async () => {
   await expect(response.json()).resolves.toEqual({
     error: "Service Unavailable",
     reason: "configuration_unavailable",
+    requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
   });
 });

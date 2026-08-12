@@ -12,6 +12,7 @@ export type {
 
 export {
   InMemoryPaymentIdempotencyStore,
+  PaymentIdempotencyUnavailableError,
   RedisPaymentIdempotencyStore,
   withPaymentIdempotency,
 } from "./idempotency.js";

@@ -39,6 +39,15 @@ export interface PaymentIdempotencyStore {
   release(input: PaymentIdempotencyReleaseInput): Promise<void>;
 }
 
+export class PaymentIdempotencyUnavailableError extends Error {
+  readonly code = "idempotency_unavailable";
+
+  constructor(options?: ErrorOptions) {
+    super("Payment idempotency is unavailable.", options);
+    this.name = "PaymentIdempotencyUnavailableError";
+  }
+}
+
 type PendingEntry = {
   readonly kind: "pending";
   readonly paymentFingerprint: string;
@@ -365,7 +374,12 @@ export function withPaymentIdempotency(
       pendingTtlSeconds,
       completedTtlSeconds,
     };
-    const begin = await store.begin(common);
+    let begin: PaymentIdempotencyBeginResult;
+    try {
+      begin = await store.begin(common);
+    } catch (cause) {
+      throw new PaymentIdempotencyUnavailableError({ cause });
+    }
     if (begin.kind === "conflict") return conflictResponse();
     if (begin.kind === "pending") return pendingResponse();
     if (begin.kind === "replay") return replayResponse(begin.response);
@@ -391,7 +405,13 @@ export function withPaymentIdempotency(
     }
 
     const cached = await cachedResponse(response, settlement);
-    await store.complete({ ...lease, response: cached });
+    try {
+      const completed = await store.complete({ ...lease, response: cached });
+      if (!completed) throw new Error("The payment idempotency lease could not be completed.");
+    } catch (cause) {
+      if (cause instanceof PaymentIdempotencyUnavailableError) throw cause;
+      throw new PaymentIdempotencyUnavailableError({ cause });
+    }
     return response;
   };
 }
