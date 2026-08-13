@@ -135,7 +135,10 @@ export function createPaymentVerifier({
     try {
       receipt = await publicClient.getTransactionReceipt({ hash: txHash });
     } catch (error) {
-      if (error instanceof TransactionReceiptNotFoundError) {
+      if (
+        error instanceof TransactionReceiptNotFoundError ||
+        (error instanceof Error && error.name === "TransactionReceiptNotFoundError")
+      ) {
         return { valid: false, reason: "transaction_not_found", retryable: true };
       }
       return { valid: false, reason: "verification_unavailable", retryable: true };

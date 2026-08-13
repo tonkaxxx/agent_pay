@@ -19,6 +19,7 @@ test("calls the real endpoint and renders its HTTP 402 requirements", async () =
   const user = userEvent.setup();
   render(<LiveApiDemo />);
 
+  await user.click(screen.getByRole("tab", { name: "GET /api/premium" }));
   await user.click(screen.getByRole("button", { name: /call live endpoint/i }));
 
   expect(fetch).toHaveBeenCalledWith("/api/premium", {

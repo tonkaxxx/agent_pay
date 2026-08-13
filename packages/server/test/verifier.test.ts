@@ -191,6 +191,21 @@ describe("createPaymentVerifier", () => {
     });
   });
 
+  test("recognizes a missing-receipt error from another viem instance", async () => {
+    const crossPackageError = new Error("receipt not found");
+    crossPackageError.name = "TransactionReceiptNotFoundError";
+    const client: ReceiptClient = {
+      getTransactionReceipt: vi.fn().mockRejectedValue(crossPackageError),
+      getBlockNumber: vi.fn(),
+    };
+
+    await expect(verifierFor(client)(hash)).resolves.toEqual({
+      valid: false,
+      reason: "transaction_not_found",
+      retryable: true,
+    });
+  });
+
   test("maps RPC failures to a retryable failure", async () => {
     const client: ReceiptClient = {
       getTransactionReceipt: vi.fn().mockRejectedValue(new Error("RPC unavailable")),
