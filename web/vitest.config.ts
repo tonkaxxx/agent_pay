@@ -6,18 +6,14 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": new URL("./src", import.meta.url).pathname,
-      "@agentpay/server": new URL("../packages/server/src/index.ts", import.meta.url).pathname,
-      "@agentpay/client": new URL("../packages/client/src/index.ts", import.meta.url).pathname,
+      "@x402/server": new URL("../packages/server/src/index.ts", import.meta.url).pathname,
+      "@x402/client": new URL("../packages/client/src/index.ts", import.meta.url).pathname,
     },
   },
   test: {
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
-    include: [
-      "src/**/*.test.{ts,tsx}",
-      "examples/**/*.test.ts",
-      "docker-compose.test.ts",
-    ],
+    include: ["src/**/*.test.{ts,tsx}", "examples/**/*.test.ts"],
     clearMocks: true,
   },
 });

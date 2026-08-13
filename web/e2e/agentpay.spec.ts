@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { decodePaymentRequiredHeader } from "@x402/core/http";
 
 test("presents the investor story and exposes the live payment quote", async ({ page }) => {
   await page.goto("/");
@@ -12,12 +11,10 @@ test("presents the investor story and exposes the live payment quote", async ({ 
     "mailto:maltsev.yar@gmail.com?subject=AgentPay%20investment%20conversation",
   );
 
-  await page.getByRole("tab", { name: /api\/premium/i }).click();
   await page.getByRole("button", { name: /call live endpoint/i }).click();
   await expect(page.locator(".response-line")).toHaveText(/402 Payment Required/);
   await expect(page.locator(".api-console pre")).toContainText('"priceUsdc": "0.01"');
   await expect(page.locator(".api-console pre")).toContainText('"chainId": 8453');
-  await expect(page.locator(".api-console pre")).not.toContainText("premiumData");
 
   const hasHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -29,9 +26,7 @@ test("the actual API route publishes exact Base Mainnet requirements", async ({ 
   const response = await request.get("/api/premium");
 
   expect(response.status()).toBe(402);
-  const encoded = response.headers()["payment-required"];
-  expect(encoded).toBeTruthy();
-  const decoded = decodePaymentRequiredHeader(encoded!);
+  expect(response.headers()["cache-control"]).toBe("no-store");
   expect(await response.json()).toEqual({
     error: "Payment Required",
     priceUsdc: "0.01",
@@ -39,33 +34,15 @@ test("the actual API route publishes exact Base Mainnet requirements", async ({ 
     network: "base",
     chainId: 8453,
   });
-  expect(decoded).toMatchObject({
-    x402Version: 2,
-    accepts: [{
-      scheme: "exact",
-      amount: "10000",
-      payTo: "0x1111111111111111111111111111111111111111",
-      network: "eip155:8453",
-    }],
-    extensions: {
-      "payment-identifier": {
-        info: { required: true },
-      },
-    },
-  });
-  expect(decoded.extensions).not.toHaveProperty("bazaar");
-  expect(JSON.stringify(decoded)).not.toContain("premiumData");
 });
 
 test("documents the 402 payment gate", async ({ page }) => {
   await page.goto("/docs");
 
   await expect(page).toHaveTitle(/Developer Docs/);
-  await expect(page.getByRole("heading", { level: 1, name: /add an x402 v2 payment gate to any route/i })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /add a 402 payment gate to any route/i })).toBeVisible();
   await expect(page.getByText(/paymentMiddleware/)).toBeVisible();
-  await expect(
-    page.getByRole("heading", { level: 2, name: /pay with a policy-controlled agent/i }),
-  ).toBeVisible();
+  await expect(page.getByRole("link", { name: /pay with your agent/i })).toBeVisible();
 
   const hasHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,

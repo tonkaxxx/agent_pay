@@ -8,14 +8,12 @@ export {
 export type {
   AgentFetch,
   AgentFetchConfig,
-  AgentPayNetwork,
+  AgentFetchDependencies,
   PaymentErrorCode,
-  PaymentEvent,
-  PaymentFailureStage,
   PaymentAuthorizationContext,
   PaymentChainId,
   PaymentNetwork,
+  PaymentRuntime,
+  PaymentTransactionContext,
   ProtocolErrorCode,
 } from "./agentFetch.js";
-
-export type { ClientEvmSigner } from "@x402/evm";

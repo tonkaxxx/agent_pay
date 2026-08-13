@@ -2,7 +2,6 @@ import { pathToFileURL } from "node:url";
 
 import {
   createVendorApp,
-  createVendorFacilitator,
   startVendorApp,
   vendorRuntimeConfiguration,
 } from "./vendor-api.js";
@@ -18,7 +17,7 @@ export function mainnetVendorRuntimeConfiguration(
 
 export function runMainnetVendorDemo(args: readonly string[], env: Environment): void {
   const config = mainnetVendorRuntimeConfiguration(args, env);
-  startVendorApp(config, createVendorApp(config, createVendorFacilitator("mainnet", process.env)), console.log);
+  startVendorApp(config, createVendorApp(config), console.log);
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -1,7 +1,5 @@
 # Mainnet receipt verification retry design
 
-> Superseded by the [x402 v2 migration](../plans/2026-08-12-x402-v2-migration.md). Retained as v1 design history.
-
 ## Problem
 
 The mainnet demo submits a USDC transfer, waits for one confirmation, and immediately

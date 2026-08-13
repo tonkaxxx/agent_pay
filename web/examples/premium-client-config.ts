@@ -1,11 +1,12 @@
 import { getAddress, type Address, type Hex } from "viem";
 
-import { USDC_BASE, type PaymentAuthorizationContext } from "@agentpay/client";
+import { USDC_BASE, type PaymentAuthorizationContext } from "@x402/client";
 
 type Environment = NodeJS.ProcessEnv | Readonly<Record<string, string | undefined>>;
 
 export interface PremiumClientConfig {
   readonly privateKey: Hex;
+  readonly rpcUrl: string;
   readonly apiUrl: string;
   readonly expectedPayTo: Address;
   readonly mainnetAllowed: boolean;
@@ -23,6 +24,7 @@ export function loadPremiumClientConfig(env: Environment): PremiumClientConfig {
 
   return {
     privateKey: privateKey as Hex,
+    rpcUrl: httpUrl(required("BASE_MAINNET_RPC_URL", env), "BASE_MAINNET_RPC_URL"),
     apiUrl: httpUrl(required("AGENTPAY_API_URL", env), "AGENTPAY_API_URL"),
     expectedPayTo: address(required("AGENTPAY_EXPECTED_PAY_TO", env)),
     mainnetAllowed: env.ALLOW_MAINNET_PAYMENTS === "true",
@@ -39,8 +41,8 @@ export function authorizePremiumPayment(
     throw new Error("Payment request URL does not match AGENTPAY_API_URL.");
   }
   if (payment.chainId !== 8453) throw new Error("Payment chain must be Base Mainnet (8453).");
-  if (payment.network !== "eip155:8453") throw new Error("Payment network must be eip155:8453.");
-  if (payment.recipient !== config.expectedPayTo) {
+  if (payment.network !== "base") throw new Error("Payment network must be base.");
+  if (payment.payTo !== config.expectedPayTo) {
     throw new Error("Payment recipient does not match AGENTPAY_EXPECTED_PAY_TO.");
   }
   if (payment.token !== USDC_BASE) {
@@ -54,7 +56,7 @@ export function authorizePremiumPayment(
   log("BASE MAINNET / REAL FUNDS");
   log(`Vendor URL: ${payment.requestUrl}`);
   log(`Chain ID: ${payment.chainId}`);
-  log(`Recipient: ${payment.recipient}`);
+  log(`Recipient: ${payment.payTo}`);
   log(`USDC token: ${payment.token}`);
   log(`Price: ${payment.priceUsdc} USDC (${payment.amount} base units)`);
 

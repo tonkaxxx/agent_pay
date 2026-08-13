@@ -4,8 +4,7 @@ import {
   createAgentFetch,
   X402ProtocolError,
   type AgentFetchConfig,
-} from "@agentpay/client";
-import { privateKeyToAccount } from "viem/accounts";
+} from "@x402/client";
 
 import {
   authorizePremiumPayment,
@@ -35,9 +34,12 @@ export async function runPremiumClient(
   let previewed = false;
 
   const agentFetchConfig: AgentFetchConfig = {
-    signer: privateKeyToAccount(config.privateKey),
-    networks: ["eip155:8453"],
+    privateKey: config.privateKey,
+    rpcUrl: config.rpcUrl,
     maxPaymentUsdc: "0.01",
+    confirmations: 2,
+    paymentVerificationRetries: 5,
+    paymentVerificationRetryDelayMs: 2_000,
     authorizePayment: (payment) => {
       const authorized = authorizePremiumPayment(
         payment,
@@ -48,11 +50,10 @@ export async function runPremiumClient(
       if (!authorized) previewed = true;
       return authorized;
     },
-    onPaymentEvent: (event) => {
-      if (event.type !== "payment_settled") return;
-      dependencies.log(`Transaction settled: ${event.transaction}`);
-      dependencies.log(`Explorer: https://basescan.org/tx/${event.transaction}`);
-      dependencies.log("WARNING: PAYMENT SETTLED. DO NOT RERUN THIS COMMAND.");
+    onTransactionSubmitted: ({ hash }) => {
+      dependencies.log(`Transaction submitted: ${hash}`);
+      dependencies.log(`Explorer: https://basescan.org/tx/${hash}`);
+      dependencies.log("WARNING: PAYMENT SUBMITTED. DO NOT RERUN THIS COMMAND.");
     },
   };
 

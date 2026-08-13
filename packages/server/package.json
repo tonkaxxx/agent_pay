@@ -1,6 +1,6 @@
 {
-  "name": "@agentpay/server",
-  "version": "0.2.0",
+  "name": "@x402/server",
+  "version": "0.1.0",
   "type": "module",
   "sideEffects": false,
   "files": ["dist"],
@@ -14,12 +14,6 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.type-tests.json"
   },
-  "dependencies": {
-    "@x402/core": "~2.22.0",
-    "@x402/evm": "~2.22.0",
-    "@x402/express": "~2.22.0",
-    "@x402/extensions": "~2.22.0",
-    "viem": "^2.55.10"
-  },
+  "dependencies": { "viem": "^2.55.10" },
   "peerDependencies": { "express": ">=5.0.0" }
 }

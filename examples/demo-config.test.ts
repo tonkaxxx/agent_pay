@@ -31,12 +31,12 @@ describe("demo configuration", () => {
     expect(DEMO_PRICE_USDC).toBe("0.01");
     expect(DEMO_NETWORKS.sepolia).toMatchObject({
       chainId: 84532,
-      network: "eip155:84532",
+      network: "base-sepolia",
       usdcAddress: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
     });
     expect(DEMO_NETWORKS.mainnet).toMatchObject({
       chainId: 8453,
-      network: "eip155:8453",
+      network: "base",
       usdcAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     });
   });

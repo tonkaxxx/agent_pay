@@ -6,8 +6,8 @@ coverage/
 .env
 .env.*
 !.env.example
-!web/.env.production.example
 .DS_Store
 .vscode/
+docs/
 !web/src/app/docs/
 !web/src/app/docs/**

@@ -1,7 +1,5 @@
 # Дизайн HTTP 402 Micropayment SDK для USDC в Base
 
-> Superseded by the [x402 v2 migration](../plans/2026-08-12-x402-v2-migration.md). Retained as v1 design history.
-
 Дата: 2026-08-02  
 Статус: утверждён пользователем
 

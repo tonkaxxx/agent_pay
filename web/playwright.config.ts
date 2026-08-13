@@ -22,10 +22,8 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:3100",
       AGENTPAY_PAY_TO: "0x1111111111111111111111111111111111111111",
+      BASE_MAINNET_RPC_URL: "https://mainnet.base.org",
       REDIS_URL: "redis://127.0.0.1:6379",
-      CDP_API_KEY_ID: "organizations/e2e/apiKeys/e2e",
-      CDP_API_KEY_SECRET: "e2e-secret",
-      AGENTPAY_OFFLINE_QUOTE_ONLY: "true",
     },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
