@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { encodePaymentRequiredHeader } from "@x402/core/http";
 import { describe, expect, test } from "vitest";
 
-import { validatePaymentRequired } from "./x402-mainnet.js";
+import { assertConsumedReplay, validatePaymentRequired } from "./x402-mainnet.js";
 
 const directory = fileURLToPath(new URL(".", import.meta.url));
 const typescript = readFileSync(`${directory}/x402-mainnet.ts`, "utf8");
@@ -85,5 +85,23 @@ describe("validatePaymentRequired", () => {
   ])("rejects an unexpected %s", (field, value) => {
     expect(() => validatePaymentRequired(challenge({ [field]: value }), API_URL))
       .toThrow("payment_policy_rejected");
+  });
+});
+
+describe("assertConsumedReplay", () => {
+  test("accepts only the stable consumed response without protected content", async () => {
+    await expect(assertConsumedReplay(Response.json({
+      error: "Conflict",
+      reason: "payment_consumed",
+    }, { status: 409 }))).resolves.toBeUndefined();
+  });
+
+  test.each([
+    [200, { premiumData: "must never replay" }],
+    [409, { error: "Conflict", reason: "payment_in_progress" }],
+    [409, { error: "Conflict", reason: "payment_consumed", premiumData: "leaked" }],
+  ])("rejects unsafe replay status/body %#", async (status, body) => {
+    await expect(assertConsumedReplay(Response.json(body, { status })))
+      .rejects.toThrow("replay_protection_failed");
   });
 });

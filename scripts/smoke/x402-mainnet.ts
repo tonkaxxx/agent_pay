@@ -90,6 +90,22 @@ function privateKey(environment: NodeJS.ProcessEnv): Hex {
   return value as Hex;
 }
 
+export async function assertConsumedReplay(response: Response): Promise<void> {
+  try {
+    const text = await response.text();
+    const body: unknown = JSON.parse(text);
+    if (response.status !== 409 || text.includes("premiumData") ||
+      typeof body !== "object" || body === null || Array.isArray(body) ||
+      JSON.stringify(Object.keys(body).sort()) !== JSON.stringify(["error", "reason"]) ||
+      (body as Record<string, unknown>).error !== "Conflict" ||
+      (body as Record<string, unknown>).reason !== "payment_consumed") {
+      throw new Error();
+    }
+  } catch {
+    throw new Error("replay_protection_failed");
+  }
+}
+
 async function preview(apiUrl: string): Promise<PaymentPreview> {
   const response = await fetch(apiUrl, {
     cache: "no-store",
@@ -119,7 +135,13 @@ export async function runSmoke(
   const signer = privateKeyToAccount(privateKey(environment));
   const client = new x402Client();
   client.register("eip155:*", new ExactEvmScheme(signer));
-  const fetchWithPayment = wrapFetchWithPayment(fetch, client);
+  let paymentSignature: string | undefined;
+  const recordingFetch: typeof fetch = async (input, init) => {
+    const request = new Request(input, init);
+    paymentSignature = request.headers.get("PAYMENT-SIGNATURE") ?? paymentSignature;
+    return fetch(request);
+  };
+  const fetchWithPayment = wrapFetchWithPayment(recordingFetch, client);
   const response = await fetchWithPayment(apiUrl, {
     cache: "no-store",
     headers: { Accept: "application/json" },
@@ -133,11 +155,21 @@ export async function runSmoke(
   if (!settlement.success || !settlement.transaction) {
     throw new Error("settlement_failed");
   }
+  if (!paymentSignature) throw new Error("payment_signature_missing");
   const data: unknown = await response.json();
+  await assertConsumedReplay(await fetch(apiUrl, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "PAYMENT-SIGNATURE": paymentSignature,
+    },
+    redirect: "error",
+  }));
   process.stdout.write(`${JSON.stringify({
     status: response.status,
     transaction: settlement.transaction,
     data,
+    replay: "payment_consumed",
   })}\n`);
 }
 
