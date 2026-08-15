@@ -8,7 +8,7 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { nonceManager, privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 
 import type { FacilitatorConfig } from "./config.js";
@@ -43,10 +43,14 @@ export async function assertBaseMainnet(reader: ChainIdReader): Promise<void> {
   }
 }
 
+export function createMainnetFacilitatorAccount(privateKey: Hex) {
+  return privateKeyToAccount(privateKey, { nonceManager });
+}
+
 export async function createMainnetFacilitatorSigner(
   config: Pick<FacilitatorConfig, "privateKey" | "rpcUrl">,
 ): Promise<FacilitatorEvmSigner> {
-  const account = privateKeyToAccount(config.privateKey);
+  const account = createMainnetFacilitatorAccount(config.privateKey);
   const client = createWalletClient({
     account,
     chain: base,
