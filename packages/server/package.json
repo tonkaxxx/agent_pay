@@ -1,5 +1,5 @@
 {
-  "name": "@x402/server",
+  "name": "@agentpay/server",
   "version": "0.1.0",
   "type": "module",
   "sideEffects": false,
@@ -19,5 +19,6 @@
     "@x402/evm": "2.22.0",
     "viem": "2.55.10"
   },
-  "peerDependencies": { "express": ">=5.0.0" }
+  "devDependencies": { "@types/node": "26.1.2" },
+  "peerDependencies": {}
 }

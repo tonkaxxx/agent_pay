@@ -2,66 +2,116 @@ import { getAddress, type Address } from "viem";
 
 type PremiumEnvironment = Readonly<Record<string, string | undefined>>;
 
+const FORBIDDEN_WEB_SECRETS = [
+  "AGENT_PRIVATE_KEY",
+  "FACILITATOR_PRIVATE_KEY",
+  "CDP_API_KEY_ID",
+  "CDP_API_KEY_SECRET",
+] as const;
+
+const PLACEHOLDER_PAYEES = new Set([
+  "0x0000000000000000000000000000000000000000",
+  "0x1111111111111111111111111111111111111111",
+]);
+
 export interface PremiumConfig {
   readonly siteUrl: string;
+  readonly resourceUrl: string;
   readonly payTo: Address;
-  readonly rpcUrl: string;
+  readonly facilitatorUrl: string;
   readonly redisUrl: string;
+}
+
+function configurationError(variable: string): Error {
+  return new Error(`Invalid premium API configuration: ${variable}`);
 }
 
 function required(environment: PremiumEnvironment, name: string): string {
   const value = environment[name];
   if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${name} must be set.`);
+    throw configurationError(name);
   }
   return value;
 }
 
-function httpUrl(value: string, name: string): string {
-  let url: URL;
+function parseHttpUrl(value: string, name: string): URL {
   try {
-    url = new URL(value);
+    const url = new URL(value);
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) {
+      throw configurationError(name);
+    }
+    return url;
   } catch {
-    throw new Error(`${name} must be a valid URL.`);
+    throw configurationError(name);
   }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error(`${name} must use HTTP or HTTPS.`);
+}
+
+function isLocalHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return normalized === "localhost" ||
+    normalized.endsWith(".localhost") ||
+    normalized === "127.0.0.1" ||
+    normalized === "0.0.0.0" ||
+    normalized === "[::1]";
+}
+
+function parseSiteUrl(environment: PremiumEnvironment): string {
+  const url = parseHttpUrl(
+    required(environment, "NEXT_PUBLIC_SITE_URL"),
+    "NEXT_PUBLIC_SITE_URL",
+  );
+  if (environment.NODE_ENV === "production" && url.protocol !== "https:") {
+    throw configurationError("NEXT_PUBLIC_SITE_URL");
+  }
+  if (environment.NODE_ENV === "production" && isLocalHostname(url.hostname)) {
+    throw configurationError("NEXT_PUBLIC_SITE_URL");
+  }
+  if (url.pathname !== "/" || url.search || url.hash) {
+    throw configurationError("NEXT_PUBLIC_SITE_URL");
   }
   return url.href;
 }
 
-function redisUrl(value: string): string {
-  let url: URL;
+function parseRedisUrl(value: string): string {
   try {
-    url = new URL(value);
+    const url = new URL(value);
+    if (url.protocol !== "redis:" && url.protocol !== "rediss:") {
+      throw configurationError("REDIS_URL");
+    }
+    return url.href;
   } catch {
-    throw new Error("REDIS_URL must be a valid Redis URL.");
+    throw configurationError("REDIS_URL");
   }
-  if (url.protocol !== "redis:" && url.protocol !== "rediss:") {
-    throw new Error("REDIS_URL must use redis or rediss.");
+}
+
+function parsePayTo(value: string): Address {
+  try {
+    const address = getAddress(value);
+    if (PLACEHOLDER_PAYEES.has(address.toLowerCase())) {
+      throw configurationError("AGENTPAY_PAY_TO");
+    }
+    return address;
+  } catch {
+    throw configurationError("AGENTPAY_PAY_TO");
   }
-  return url.href;
 }
 
 export function loadPremiumConfig(environment: PremiumEnvironment): PremiumConfig {
-  let payTo: Address;
-  try {
-    payTo = getAddress(required(environment, "AGENTPAY_PAY_TO"));
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith("AGENTPAY_PAY_TO")) throw error;
-    throw new Error("AGENTPAY_PAY_TO must be a valid EVM address.");
+  for (const variable of FORBIDDEN_WEB_SECRETS) {
+    if (environment[variable] !== undefined) {
+      throw configurationError(variable);
+    }
   }
 
+  const siteUrl = parseSiteUrl(environment);
   return {
-    siteUrl: httpUrl(
-      required(environment, "NEXT_PUBLIC_SITE_URL"),
-      "NEXT_PUBLIC_SITE_URL",
-    ),
-    payTo,
-    rpcUrl: httpUrl(
-      required(environment, "BASE_MAINNET_RPC_URL"),
-      "BASE_MAINNET_RPC_URL",
-    ),
-    redisUrl: redisUrl(required(environment, "REDIS_URL")),
+    siteUrl,
+    resourceUrl: new URL("/api/premium", siteUrl).href,
+    payTo: parsePayTo(required(environment, "AGENTPAY_PAY_TO")),
+    facilitatorUrl: parseHttpUrl(
+      required(environment, "FACILITATOR_URL"),
+      "FACILITATOR_URL",
+    ).href,
+    redisUrl: parseRedisUrl(required(environment, "REDIS_URL")),
   };
 }
