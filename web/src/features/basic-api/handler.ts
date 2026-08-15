@@ -3,9 +3,11 @@ const noStoreHeaders = {
 } as const;
 
 export function createBasicHandler() {
-  return async (_request: Request): Promise<Response> =>
-    Response.json({
+  return async (request: Request): Promise<Response> => {
+    void request;
+    return Response.json({
       basicData: "Free public data from AgentPay — no payment required.",
       tier: "free",
     }, { status: 200, headers: noStoreHeaders });
+  };
 }

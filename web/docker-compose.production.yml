@@ -1,0 +1,113 @@
+name: agentpay
+
+x-app-hardening: &app-hardening
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  read_only: true
+  init: true
+  restart: unless-stopped
+  stop_grace_period: 30s
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  web:
+    <<: *app-hardening
+    # The production Traefik file provider targets this stable internal DNS name.
+    container_name: agentpay-app
+    image: ${AGENTPAY_IMAGE:?set an immutable AgentPay image tag}
+    user: "1000:1000"
+    command: ["node", "/app/web/server.js"]
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?set the public HTTPS origin}
+      AGENTPAY_PAY_TO: ${AGENTPAY_PAY_TO:?set the USDC recipient}
+      FACILITATOR_URL: http://facilitator:4022
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set a URL-safe Redis password}@redis:6379/0
+    depends_on:
+      facilitator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [backend, web-net]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    pids_limit: 256
+    mem_limit: 768m
+    cpus: 1.5
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: web-net
+      traefik.http.routers.agentpay.rule: Host(`agentpay.thebestsites.ru`)
+      traefik.http.routers.agentpay.entrypoints: websecure
+      traefik.http.routers.agentpay.tls: "true"
+      traefik.http.routers.agentpay.tls.certresolver: myresolver
+      traefik.http.services.agentpay.loadbalancer.server.port: "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/basic').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  facilitator:
+    <<: *app-hardening
+    image: ${AGENTPAY_IMAGE:?set an immutable AgentPay image tag}
+    user: "1000:1000"
+    command: ["node", "/app/facilitator/dist/index.js"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: "4022"
+      FACILITATOR_NETWORK: eip155:8453
+      BASE_MAINNET_RPC_URL: ${BASE_MAINNET_RPC_URL:?set a Base Mainnet RPC URL}
+      FACILITATOR_PRIVATE_KEY: ${FACILITATOR_PRIVATE_KEY:?set a dedicated gas-only facilitator key}
+    networks:
+      backend:
+      egress:
+        gw_priority: 1
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4022/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  redis:
+    <<: *app-hardening
+    image: redis:7.4.7-alpine@sha256:02f2cc4882f8bf87c79a220ac958f58c700bdec0dfb9b9ea61b62fb0e8f1bfcf
+    user: "999:1000"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set a URL-safe Redis password}
+    command: ["/bin/sh", "-ec", "exec redis-server --appendonly yes --appendfsync everysec --requirepass \"$$REDIS_PASSWORD\""]
+    networks: [backend]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    pids_limit: 128
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -qx PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - agentpay-redis-data:/data
+
+networks:
+  backend:
+    name: agentpay-backend
+    internal: true
+  web-net:
+    external: true
+    name: web-net
+  egress:
+    name: agentpay-egress
+
+volumes:
+  agentpay-redis-data:
+    name: agentpay-redis-data

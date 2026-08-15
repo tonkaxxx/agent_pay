@@ -21,7 +21,7 @@ const founderMail = "mailto:maltsev.yar@gmail.com?subject=AgentPay%20investment%
 const proofPoints = [
   ["Status", "Working MVP"],
   ["Settlement", "USDC on Base"],
-  ["Protocol", "Native HTTP 402"],
+  ["Protocol", "x402 v2"],
   ["Live price", "$0.01 / request"],
 ] as const;
 
@@ -35,13 +35,13 @@ const protocolSteps = [
   {
     number: "02",
     title: "Discover & pay",
-    copy: "HTTP 402 returns exact USDC terms. Local policy approves the origin, chain and spend.",
+    copy: "HTTP 402 returns exact USDC terms. Wallet policy approves the origin, asset, recipient and spend.",
     code: "402 · 0.01 USDC",
   },
   {
     number: "03",
     title: "Verify & unlock",
-    copy: "The API verifies the onchain receipt, atomically claims it, and releases the resource.",
+    copy: "The API locks the signed authorization, settles it onchain, and only then releases the resource.",
     code: "200 · premium data",
   },
 ] as const;
@@ -62,8 +62,8 @@ const pillars = [
   {
     icon: LockKeyhole,
     number: "03",
-    title: "Verified onchain",
-    copy: "Receipts, confirmations, official USDC transfer logs and durable replay protection gate every response.",
+    title: "Observable by policy",
+    copy: "Standard quotes, authorization state and settlement outcomes create an auditable control plane for every response.",
   },
 ] as const;
 
@@ -134,6 +134,10 @@ export function LandingPage() {
               AgentPay gives APIs a machine-native price and agents a policy-controlled way to pay it.
               One familiar HTTP status becomes a market primitive: ask, quote, settle, continue.
             </p>
+            <p>
+              AgentPay is the policy, security and observability layer for agentic commerce —
+              the control plane between autonomous wallets and paid APIs.
+            </p>
             <div className="thesis-note">
               <Network aria-hidden="true" />
               <span>Built for the point where API infrastructure becomes agent commerce.</span>
@@ -171,9 +175,9 @@ export function LandingPage() {
             <h2 id="live-api-title">Not a mockup.<br /><em>A paid API.</em></h2>
             <p>
               Call the public endpoint. It quotes exactly $0.01 in real USDC on Base.
-              A verified transaction hash unlocks the premium response once — and only once.
-              The returned text is intentionally fixed and non-sensitive: this proves settlement,
-              not authenticated access control.
+              A signed x402 v2 authorization is locked, verified and settled exactly once.
+              Self-hosted settlement keeps the payment path on the same production server,
+              while the facilitator&apos;s gas-only wallet sponsors the Base transaction.
             </p>
             <div className="funds-warning"><CircleDollarSign aria-hidden="true" /> REAL FUNDS · BASE MAINNET</div>
             <div className="api-stack" aria-label="API infrastructure">

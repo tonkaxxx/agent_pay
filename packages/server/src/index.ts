@@ -1,20 +1,28 @@
 export {
-  InMemoryReplayStore,
-  createPaymentVerifier,
-  getUsdcAddress,
-} from "./verifier.js";
+  createAgentPayResourceServer,
+  createPremiumRoute,
+} from "./resource-server.js";
+export {
+  BASE_NETWORK,
+  BASE_USDC,
+  PREMIUM_PAYMENT_POLICY,
+} from "./payment-policy.js";
+export {
+  InvalidAuthorizationError,
+  authorizationFingerprint,
+} from "./authorization.js";
+export type { AuthorizationPolicy } from "./authorization.js";
+export {
+  AuthorizationStoreUnavailableError,
+  RedisAuthorizationStore,
+} from "./authorization-store.js";
 export type {
-  CreatePaymentVerifierOptions,
-  PaymentFailureReason,
-  PaymentRequirements,
-  PaymentVerificationResult,
-  PaymentVerifier,
-  ReceiptClient,
-  ReplayStore,
-  SupportedChainId,
-} from "./verifier.js";
-export { PAYMENT_HEADER, paymentMiddleware } from "./middleware.js";
+  AuthorizationAcquireResult,
+  AuthorizationStore,
+  RedisEvalClient,
+} from "./authorization-store.js";
+export { withAuthorizationLock } from "./authorization-guard.js";
 export type {
-  PaymentMiddlewareOptions,
-  PaymentRequiredPayload,
-} from "./middleware.js";
+  PaymentRequestHandler,
+  WithAuthorizationLockOptions,
+} from "./authorization-guard.js";

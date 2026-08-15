@@ -5,32 +5,43 @@ import { DocsPage } from "./docs-page";
 
 afterEach(() => cleanup());
 
-test("documents how to add an HTTP 402 payment gate to a route", () => {
-  render(<DocsPage />);
+test("documents the standard self-hosted x402 v2 flow", () => {
+  const { container } = render(<DocsPage />);
+  const text = container.textContent ?? "";
 
-  expect(screen.getByRole("heading", { level: 1, name: /add a 402 payment gate/i }))
+  expect(screen.getByRole("heading", { level: 1, name: /standard x402 payments/i }))
     .toBeInTheDocument();
-  expect(screen.getAllByText(/paymentMiddleware/).length).toBeGreaterThan(0);
-  expect(screen.getByText(/pnpm add @x402\/server/)).toBeInTheDocument();
-  for (const status of ["200", "402", "403", "503"]) {
-    expect(screen.getByRole("cell", { name: status })).toBeInTheDocument();
+  for (const header of ["PAYMENT-REQUIRED", "PAYMENT-SIGNATURE", "PAYMENT-RESPONSE"]) {
+    expect(text).toContain(header);
   }
-  expect(screen.getAllByText(/X-Payment-Tx/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/Base Sepolia/).length).toBeGreaterThan(0);
+  expect(text).toContain("eip155:8453");
+  expect(text).toContain("0.01 USDC");
+  expect(text).toMatch(/self-hosted facilitator/i);
+  expect(text).toMatch(/gas sponsor/i);
+  expect(text).toMatch(/no buyer RPC or ETH/i);
+  expect(text).not.toMatch(new RegExp(["X", "Payment", "Tx"].join("-"), "i"));
+  expect(text).not.toMatch(/CDP/i);
+  expect(text).not.toMatch(/Sepolia/i);
   expect(screen.getByRole("link", { name: /view source on github/i })).toHaveAttribute(
     "href",
     "https://github.com/tonkaxxx/agent_pay",
   );
 });
 
-test("offers a private-key prompt for paying with a user's own AI agent", () => {
-  render(<DocsPage />);
+test("offers the exact safe one-prompt example and states the agent capability boundary", () => {
+  const { container } = render(<DocsPage />);
+  const text = container.textContent ?? "";
 
-  expect(screen.getByRole("heading", { level: 2, name: /pay with your own ai agent/i })).toBeInTheDocument();
-  expect(screen.getByText(/agentpay\.thebestsites\.ru\/api\/premium/)).toBeInTheDocument();
-  expect(screen.getAllByText(/\[INSERT_PRIVATE_KEY\]/).length).toBeGreaterThan(0);
+  expect(screen.getByRole("heading", { level: 2, name: /pay with any capable agent/i }))
+    .toBeInTheDocument();
+  expect(text).toContain("here is crypto wallet private key:");
+  expect(text).toContain("AGENT_PRIVATE_KEY=<YOUR_NEW_LOW_BALANCE_PRIVATE_KEY>");
+  expect(text).toContain("https://agentpay.thebestsites.ru/api/premium");
+  expect(text).toMatch(/execute code and make outbound HTTPS requests/i);
+  expect(text).toMatch(/text-only agent cannot/i);
+  expect(text).not.toMatch(/AGENT_PRIVATE_KEY=0x[0-9a-fA-F]{64}/);
   expect(screen.getByText(/REAL FUNDS · BASE MAINNET/)).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: /pay with your agent/i })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: /pay with an agent/i })).toHaveAttribute(
     "href",
     "#agent",
   );

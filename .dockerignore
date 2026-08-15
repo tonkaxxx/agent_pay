@@ -2,6 +2,7 @@
 .worktrees
 .superpowers
 docs
+INVESTORS_RESEARCH.md
 node_modules
 **/node_modules
 **/dist
@@ -13,3 +14,5 @@ node_modules
 **/.env.local
 **/playwright-report
 **/test-results
+**/__pycache__
+**/*.py[cod]

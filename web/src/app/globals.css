@@ -9,8 +9,10 @@
   --night: #191a17;
   --night-soft: #252620;
   --acid: #d9f47a;
-  --font-display-fallback: Georgia, "Times New Roman", serif;
-  --font-body-fallback: "Helvetica Neue", Arial, sans-serif;
+  --font-display: Georgia, "Times New Roman", serif;
+  --font-display-fallback: serif;
+  --font-body: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body-fallback: sans-serif;
 }
 
 * { box-sizing: border-box; }

@@ -1,18 +1,98 @@
+name: agentpay
+
 services:
   web:
     build:
       context: ..
       dockerfile: web/Dockerfile
-    ports:
-      - "3000:3000"
+      args:
+        AGENTPAY_RELEASE: local
+        NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000/
+    image: agentpay:local
+    command: ["node", "/app/web/server.js"]
     environment:
-      REDIS_URL: redis://redis:6379
-    env_file:
-      - .env.local
+      NODE_ENV: production
+      AGENTPAY_ALLOW_INSECURE_LOCAL_ORIGIN: "true"
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000/
+      AGENTPAY_PAY_TO: 0x58B0fF9Fd53C854f3779acdE649a7FAc2de2d1CB
+      FACILITATOR_URL: http://facilitator:4022
+      REDIS_URL: redis://:local-agentpay-only@redis:6379/0
+    ports:
+      - "127.0.0.1:3000:3000"
     depends_on:
-      - redis
+      facilitator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [backend, public]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    init: true
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/basic').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  facilitator:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+      args:
+        AGENTPAY_RELEASE: local
+        NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000/
+    image: agentpay:local
+    command: ["node", "/app/facilitator/dist/index.js"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: "4022"
+      FACILITATOR_NETWORK: eip155:8453
+      BASE_MAINNET_RPC_URL: ${BASE_MAINNET_RPC_URL:?set a Base Mainnet RPC URL}
+      FACILITATOR_PRIVATE_KEY: ${FACILITATOR_PRIVATE_KEY:?set a dedicated gas-only facilitator key}
+    networks:
+      backend:
+      egress:
+        gw_priority: 1
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4022/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.7-alpine@sha256:02f2cc4882f8bf87c79a220ac958f58c700bdec0dfb9b9ea61b62fb0e8f1bfcf
+    user: "999:1000"
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--requirepass", "local-agentpay-only"]
+    networks: [backend]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "local-agentpay-only", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - agentpay-redis-local:/data
+
+networks:
+  backend:
+    internal: true
+  egress:
+  public:
+
+volumes:
+  agentpay-redis-local:

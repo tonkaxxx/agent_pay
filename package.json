@@ -1,5 +1,5 @@
 {
-  "name": "x402-usdc-sdk",
+  "name": "agentpay",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,10 +12,14 @@
     "lint": "corepack pnpm --dir web lint",
     "test:e2e": "corepack pnpm --dir web test:e2e",
     "dev:web": "corepack pnpm --dir web dev",
-    "demo:vendor": "tsx examples/vendor-api.ts",
-    "demo:agent": "tsx examples/ai-agent.ts",
-    "demo:vendor:mainnet": "tsx examples/vendor-api-mainnet.ts",
-    "demo:agent:mainnet": "tsx examples/ai-agent-mainnet.ts"
+    "smoke:preview": "tsx scripts/smoke/x402-mainnet.ts",
+    "smoke:mainnet": "tsx scripts/smoke/x402-mainnet.ts --execute"
+  },
+  "dependencies": {
+    "@x402/core": "2.22.0",
+    "@x402/evm": "2.22.0",
+    "@x402/fetch": "2.22.0",
+    "viem": "2.55.10"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
@@ -26,7 +30,6 @@
     "supertest": "^7.2.2",
     "tsx": "^4.23.4",
     "typescript": "^7.0.2",
-    "viem": "^2.55.10",
     "vitest": "^4.1.10"
   }
 }

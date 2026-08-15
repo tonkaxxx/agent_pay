@@ -1,24 +1,8 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, Manrope } from "next/font/google";
 
 import "./globals.css";
 
 import { publicSiteUrl } from "./site-url";
-
-const displayFont = Instrument_Serif({
-  weight: "400",
-  style: ["normal", "italic"],
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-});
-
-const bodyFont = Manrope({
-  weight: "variable",
-  subsets: ["latin"],
-  variable: "--font-body",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   metadataBase: publicSiteUrl(),
@@ -46,7 +30,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${displayFont.variable} ${bodyFont.variable}`}>
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

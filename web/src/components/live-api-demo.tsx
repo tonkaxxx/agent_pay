@@ -1,20 +1,72 @@
 "use client";
 
+import { decodePaymentRequiredHeader } from "@x402/core/http";
 import { ArrowRight, LoaderCircle, Play, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
 type Endpoint = "basic" | "premium";
 
+interface PublicPaymentTerms {
+  readonly x402Version: number;
+  readonly resource: { readonly url: string };
+  readonly accepts: readonly [{
+    readonly scheme: string;
+    readonly network: string;
+    readonly amount: string;
+    readonly asset: string;
+    readonly payTo: string;
+    readonly maxTimeoutSeconds: number;
+  }];
+}
+
+type ProtocolTerms =
+  | { readonly kind: "decoded"; readonly value: PublicPaymentTerms }
+  | { readonly kind: "missing" }
+  | { readonly kind: "none" };
+
 type DemoState =
   | { readonly kind: "idle" }
   | { readonly kind: "loading" }
-  | { readonly kind: "response"; readonly status: number; readonly payload: unknown }
+  | {
+    readonly kind: "response";
+    readonly status: number;
+    readonly payload: unknown;
+    readonly protocolTerms: ProtocolTerms;
+  }
   | { readonly kind: "error" };
 
 const endpoints: Readonly<Record<Endpoint, { readonly path: string; readonly url: string }>> = {
   basic: { path: "GET /api/basic", url: "/api/basic" },
   premium: { path: "GET /api/premium", url: "/api/premium" },
 };
+
+function publicTerms(response: Response): ProtocolTerms {
+  if (response.status !== 402) return { kind: "none" };
+  const encoded = response.headers.get("PAYMENT-REQUIRED");
+  if (!encoded) return { kind: "missing" };
+  try {
+    const decoded = decodePaymentRequiredHeader(encoded);
+    const accepted = decoded.accepts[0];
+    if (!accepted) return { kind: "missing" };
+    return {
+      kind: "decoded",
+      value: {
+        x402Version: decoded.x402Version,
+        resource: { url: decoded.resource.url },
+        accepts: [{
+          scheme: accepted.scheme,
+          network: accepted.network,
+          amount: accepted.amount,
+          asset: accepted.asset,
+          payTo: accepted.payTo,
+          maxTimeoutSeconds: accepted.maxTimeoutSeconds,
+        }],
+      },
+    };
+  } catch {
+    return { kind: "missing" };
+  }
+}
 
 export function LiveApiDemo() {
   const [endpoint, setEndpoint] = useState<Endpoint>("basic");
@@ -28,7 +80,12 @@ export function LiveApiDemo() {
         headers: { Accept: "application/json" },
       });
       const payload: unknown = await response.json();
-      setState({ kind: "response", status: response.status, payload });
+      setState({
+        kind: "response",
+        status: response.status,
+        payload,
+        protocolTerms: publicTerms(response),
+      });
     } catch {
       setState({ kind: "error" });
     }
@@ -85,6 +142,15 @@ export function LiveApiDemo() {
               <span>←</span> {statusLabel}
             </div>
             <pre>{JSON.stringify(state.payload, null, 2)}</pre>
+            {state.protocolTerms.kind === "decoded" && (
+              <>
+                <div className="response-line">Decoded PAYMENT-REQUIRED</div>
+                <pre>{JSON.stringify(state.protocolTerms.value, null, 2)}</pre>
+              </>
+            )}
+            {state.protocolTerms.kind === "missing" && (
+              <div className="console-error">Standard payment header unavailable.</div>
+            )}
           </>
         )}
         {state.kind === "error" && (
