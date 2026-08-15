@@ -11,6 +11,3 @@ coverage/
 .vscode/
 __pycache__/
 *.py[cod]
-docs/
-!web/src/app/docs/
-!web/src/app/docs/**
