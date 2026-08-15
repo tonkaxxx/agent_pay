@@ -1,7 +1,7 @@
 # AgentPay Small Production Refactor Design
 
 **Date:** 2026-08-15
-**Status:** Proposed
+**Status:** Approved
 
 ## Goal
 
