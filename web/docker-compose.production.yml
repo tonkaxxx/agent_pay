@@ -16,6 +16,8 @@ x-app-hardening: &app-hardening
 services:
   web:
     <<: *app-hardening
+    # The production Traefik file provider targets this stable internal DNS name.
+    container_name: agentpay-app
     image: ${AGENTPAY_IMAGE:?set an immutable AgentPay image tag}
     user: "1000:1000"
     command: ["node", "/app/web/server.js"]
@@ -41,7 +43,7 @@ services:
       traefik.http.routers.agentpay.rule: Host(`agentpay.thebestsites.ru`)
       traefik.http.routers.agentpay.entrypoints: websecure
       traefik.http.routers.agentpay.tls: "true"
-      traefik.http.routers.agentpay.tls.certresolver: letsencrypt
+      traefik.http.routers.agentpay.tls.certresolver: myresolver
       traefik.http.services.agentpay.loadbalancer.server.port: "3000"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/basic').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]

@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest";
 
 interface ComposeService {
   image?: string;
+  container_name?: string;
   command?: string[];
   environment?: Record<string, string>;
   networks?: Record<string, unknown>;
@@ -14,6 +15,7 @@ interface ComposeService {
   read_only?: boolean;
   restart?: string;
   healthcheck?: unknown;
+  labels?: Record<string, string>;
   volumes?: Array<{
     type: string;
     source: string;
@@ -85,6 +87,14 @@ describe("production Compose policy", () => {
     expect(config.services.facilitator.ports).toBeUndefined();
     expect(config.services.redis.ports).toBeUndefined();
     expect(config.networks.egress.internal).not.toBe(true);
+  });
+
+  test("matches the production Traefik service name and certificate resolver", () => {
+    const web = renderCompose().services.web;
+    expect(web.container_name).toBe("agentpay-app");
+    expect(web.labels).toMatchObject({
+      "traefik.http.routers.agentpay.tls.certresolver": "myresolver",
+    });
   });
 
   test("separates web, settlement, and Redis secrets", () => {
