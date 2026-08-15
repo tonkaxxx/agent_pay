@@ -60,10 +60,17 @@ function parseSiteUrl(environment: PremiumEnvironment): string {
     required(environment, "NEXT_PUBLIC_SITE_URL"),
     "NEXT_PUBLIC_SITE_URL",
   );
-  if (environment.NODE_ENV === "production" && url.protocol !== "https:") {
-    throw configurationError("NEXT_PUBLIC_SITE_URL");
+  const local = isLocalHostname(url.hostname);
+  const localOverride = environment.AGENTPAY_ALLOW_INSECURE_LOCAL_ORIGIN;
+  if (localOverride !== undefined && localOverride !== "true") {
+    throw configurationError("AGENTPAY_ALLOW_INSECURE_LOCAL_ORIGIN");
   }
-  if (environment.NODE_ENV === "production" && isLocalHostname(url.hostname)) {
+  const allowLocalHttp = localOverride === "true" && local && url.protocol === "http:";
+  if (localOverride === "true" && !allowLocalHttp) {
+    throw configurationError("AGENTPAY_ALLOW_INSECURE_LOCAL_ORIGIN");
+  }
+  if (environment.NODE_ENV === "production" &&
+    ((local && !allowLocalHttp) || (!local && url.protocol !== "https:"))) {
     throw configurationError("NEXT_PUBLIC_SITE_URL");
   }
   if (url.pathname !== "/" || url.search || url.hash) {

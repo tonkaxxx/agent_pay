@@ -14,7 +14,11 @@ export default defineConfig({
     environment: "jsdom",
     server: { deps: { inline: ["@x402/next"] } },
     setupFiles: ["./vitest.setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: [
+      "src/**/*.test.{ts,tsx}",
+      "docker-compose.test.ts",
+      "scripts/**/*.test.ts",
+    ],
     clearMocks: true,
   },
 });

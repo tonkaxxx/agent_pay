@@ -20,6 +20,17 @@ test("loads the canonical production premium API configuration", () => {
   });
 });
 
+test("allows an explicit loopback-only HTTP origin for container smoke tests", () => {
+  expect(loadPremiumConfig({
+    ...validEnvironment,
+    NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:3000/",
+    AGENTPAY_ALLOW_INSECURE_LOCAL_ORIGIN: "true",
+  })).toMatchObject({
+    siteUrl: "http://127.0.0.1:3000/",
+    resourceUrl: "http://127.0.0.1:3000/api/premium",
+  });
+});
+
 test.each([
   ["NEXT_PUBLIC_SITE_URL", undefined],
   ["NEXT_PUBLIC_SITE_URL", "http://agentpay.example"],

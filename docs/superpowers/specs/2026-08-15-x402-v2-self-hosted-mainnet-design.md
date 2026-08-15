@@ -52,10 +52,12 @@ One Docker Compose project on the existing production server contains:
    packages. It verifies EVM `exact` authorizations and settles them on Base.
 3. `redis`: the private atomic request-lock and consumed-authorization store.
 
-Traefik terminates public TLS and routes only to `web`. The facilitator and
-Redis are reachable only on an internal Compose network and publish no host
-ports. The web service calls the facilitator through the standard `/supported`,
-`/verify`, and `/settle` interface.
+Traefik terminates public TLS and routes only to `web`. The facilitator control
+API and Redis are reachable only on the internal `backend` network and publish
+no host ports. A separate bridge network supplies outbound NAT only to the
+facilitator, with explicit gateway priority, so it can reach Base RPC without
+making the facilitator API public. The web service calls the facilitator
+through the standard `/supported`, `/verify`, and `/settle` interface.
 
 The facilitator has a dedicated low-balance hot wallet funded only with enough
 Base ETH to sponsor settlement gas. It never receives or stores buyer private

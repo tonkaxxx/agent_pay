@@ -20,6 +20,17 @@ curl -i http://localhost:3000/api/premium
 ```
 
 Local paid execution additionally needs the facilitator and Redis services.
+To run the complete non-paying container stack, export a Base Mainnet RPC URL
+and a newly generated, unfunded gas-only facilitator key, then run:
+
+```sh
+docker compose -f web/docker-compose.yml up -d --build
+node web/scripts/verify-production.mjs \
+  --base-url=http://127.0.0.1:3000 --local
+```
+
+The local Compose file is the only place that enables the explicit loopback
+HTTP override. Production continues to require the canonical HTTPS origin.
 
 ## Web-only variables
 
@@ -43,6 +54,18 @@ facilitator gas sponsor submits settlement, so the buyer needs no ETH or RPC.
 
 See the repository root README and `scripts/smoke` for guarded preview and
 mainnet commands.
+
+## Production Compose
+
+`docker-compose.production.yml` runs exactly `web`, `facilitator`, and
+authenticated persistent Redis from one Compose project. Web and Redis traffic
+stays on the internal backend network. Only facilitator receives an outbound
+gateway to Base RPC; only web joins the external Traefik `web-net`.
+
+Copy `.env.production.example` to the ignored `.env.production`, set mode
+`0600`, and replace every placeholder. `AGENTPAY_IMAGE` must use the full
+40-character release commit as its tag (or an image digest); mutable tags such
+as `latest` are rejected by the production verifier.
 
 ## Verification
 

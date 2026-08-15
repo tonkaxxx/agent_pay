@@ -618,7 +618,9 @@ git commit -m "docs: document standard x402 v2 agent access"
 **Interfaces:**
 - One immutable `AGENTPAY_IMAGE` supplies both `web` and `facilitator` commands.
 - Public: Traefik reaches `web:3000` through external `web-net`.
-- Internal: `web -> facilitator:4022`, `web -> redis:6379`, and `facilitator -> Base RPC`.
+- Internal: `web -> facilitator:4022` and `web -> redis:6379` stay on an
+  internal backend network; facilitator-only egress reaches Base RPC through a
+  second bridge network with explicit gateway priority.
 - Secrets: web receives no RPC or private keys; facilitator receives only RPC and gas key; Redis password is shared only where required.
 
 - [ ] **Step 1: Write failing Compose policy tests**
