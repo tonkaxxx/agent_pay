@@ -7,6 +7,19 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@x402/core':
+        specifier: 2.22.0
+        version: 2.22.0
+      '@x402/evm':
+        specifier: 2.22.0
+        version: 2.22.0(typescript@7.0.2)
+      '@x402/fetch':
+        specifier: 2.22.0
+        version: 2.22.0
+      viem:
+        specifier: 2.55.10
+        version: 2.55.10(typescript@7.0.2)(zod@4.4.3)
     devDependencies:
       '@types/express':
         specifier: ^5.0.6
@@ -32,18 +45,9 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
-      viem:
-        specifier: ^2.55.10
-        version: 2.55.10(typescript@7.0.2)(zod@4.4.3)
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1(@noble/hashes@1.8.0))(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(tsx@4.23.4))
-
-  packages/client:
-    dependencies:
-      viem:
-        specifier: ^2.55.10
-        version: 2.55.10(typescript@7.0.2)(zod@4.4.3)
 
   packages/facilitator:
     dependencies:
@@ -94,9 +98,6 @@ importers:
       '@agentpay/server':
         specifier: workspace:*
         version: link:../packages/server
-      '@x402/client':
-        specifier: workspace:*
-        version: link:../packages/client
       '@x402/core':
         specifier: 2.22.0
         version: 2.22.0
@@ -1446,6 +1447,9 @@ packages:
 
   '@x402/extensions@2.22.0':
     resolution: {integrity: sha512-E5Ma1Fs1GwO/ET7KtGUI7dPuVFoINR+mwTWVoGdNi3DsJBJKDWSA7Ta7bDgSANzV3XCAMK9gvz/VSItZliApMA==}
+
+  '@x402/fetch@2.22.0':
+    resolution: {integrity: sha512-+uMCPGXw1h7YGjS778YnwUi7YvZ5Ny8XeFjBL8TvQuy9T+j8O5x/zDQu9nyNaOa/OppTqVh+CkpW+xs17ePyXg==}
 
   '@x402/next@2.22.0':
     resolution: {integrity: sha512-CTEkPiLJZZ1PkN4FQ3gA7zvqbXgUIHkRFbrT0dqsD8ToeJNA8YsTFyXWTnUTttWJUUszuNwK/GzGsjlYlx0DOg==}
@@ -4411,6 +4415,10 @@ snapshots:
       - ethers
       - typescript
       - utf-8-validate
+
+  '@x402/fetch@2.22.0':
+    dependencies:
+      '@x402/core': 2.22.0
 
   '@x402/next@2.22.0(next@16.3.0(@babel/core@7.29.7(supports-color@7.2.0))(@playwright/test@1.62.1)(@types/node@26.1.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3)':
     dependencies:

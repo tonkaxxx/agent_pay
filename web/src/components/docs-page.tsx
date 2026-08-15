@@ -12,52 +12,51 @@ import Link from "next/link";
 
 import { CodeBlock } from "./code-block";
 
-const installCommand = `pnpm add @x402/server`;
+const installCommand = `pnpm add @x402/core@2.22.0 @x402/evm@2.22.0 @x402/fetch@2.22.0 viem`;
 
-const middlewareExample = `import { paymentMiddleware } from "@x402/server";
-import express from "express";
+const clientExample = `import { x402Client } from "@x402/core/client";
+import { ExactEvmScheme } from "@x402/evm/exact/client";
+import { wrapFetchWithPayment } from "@x402/fetch";
+import { privateKeyToAccount } from "viem/accounts";
 
-const app = express();
+const signer = privateKeyToAccount(process.env.AGENT_PRIVATE_KEY);
+const client = new x402Client();
+client.register("eip155:*", new ExactEvmScheme(signer));
 
-app.get(
-  "/api/data",
-  paymentMiddleware({
-    priceUsdc: "0.01",                          // 1 US cent
-    payTo: "0x1111111111111111111111111111111111111111", // your wallet
-    chainId: 84532,                             // Base Sepolia
-    rpcUrl: process.env.BASE_SEPOLIA_RPC_URL!,
-  }),
-  (_request, response) => {
-    response.json({ data: "Here is your premium data" });
-  },
+const paidFetch = wrapFetchWithPayment(fetch, client);
+const response = await paidFetch(
+  "https://agentpay.thebestsites.ru/api/premium",
 );
 
-app.listen(3000);`;
+console.log(await response.json());`;
 
 const paymentRequired = `HTTP/1.1 402 Payment Required
+PAYMENT-REQUIRED: <base64-encoded-x402-v2-terms>
 content-type: application/json
 
 {
   "error": "Payment Required",
+  "x402Version": 2,
   "priceUsdc": "0.01",
-  "payTo": "0x1111111111111111111111111111111111111111",
-  "network": "base-sepolia",
-  "chainId": 84532
+  "network": "eip155:8453"
 }`;
 
-const paidRequest = `curl -i $'http://127.0.0.1:3000/api/data' \\
-  -H 'X-Payment-Tx: 0x<receipt-transaction-hash>'`;
+const protocolHeaders = `PAYMENT-REQUIRED   server → agent   price and resource terms
+PAYMENT-SIGNATURE  agent → server   signed EIP-3009 authorization
+PAYMENT-RESPONSE   server → agent   confirmed settlement result`;
 
-const agentPrompt = `here is crypto wallet private key: 
-[INSERT_PRIVATE_KEY]
+const agentPrompt = `here is crypto wallet private key:
+AGENT_PRIVATE_KEY=<YOUR_NEW_LOW_BALANCE_PRIVATE_KEY>
 
-Fetch data from the following API endpoint: https://agentpay.thebestsites.ru/api/premium `;
+Fetch data from the following API endpoint:
+https://agentpay.thebestsites.ru/api/premium`;
 
 const statuses = [
-  ["402", "Payment required", "No X-Payment-Tx header; exact price, chain, and recipient are returned."],
-  ["200", "Paid", "Receipt verified and the transaction hash is claimed exactly once."],
-  ["403", "Invalid payment", "Malformed, failed, insufficient, or already-used transaction."],
-  ["503", "Retry safely", "Receipt, confirmations, or RPC temporarily unavailable."],
+  ["402", "Payment required", "Read PAYMENT-REQUIRED, apply wallet policy, then sign once."],
+  ["200", "Settled", "Read the resource and decode PAYMENT-RESPONSE."],
+  ["409", "Authorization consumed", "Create a fresh request; no paid body is replayed."],
+  ["502", "Settlement failed", "No resource was released; inspect the settlement result."],
+  ["503", "Infrastructure unavailable", "Retry later without assuming payment succeeded."],
 ] as const;
 
 export function DocsPage() {
@@ -67,7 +66,7 @@ export function DocsPage() {
         <Link className="wordmark" href="/" aria-label="AgentPay home">
           <span className="wordmark-mark">A</span> AgentPay
         </Link>
-        <span className="docs-header-label">Developer docs · v0.1</span>
+        <span className="docs-header-label">Developer docs · x402 v2</span>
         <a href="https://github.com/tonkaxxx/agent_pay" target="_blank" rel="noreferrer">
           View source on GitHub <ArrowUpRight aria-hidden="true" />
         </a>
@@ -78,23 +77,24 @@ export function DocsPage() {
           <Link href="/"><ArrowLeft aria-hidden="true" /> Back to overview</Link>
           <nav aria-label="Documentation sections">
             <a href="#quickstart">Quickstart</a>
-            <a href="#install">Install</a>
-            <a href="#middleware">Guard a route</a>
-            <a href="#contract">The 402 requirement</a>
+            <a href="#install">Official client</a>
+            <a href="#client">Fetch the resource</a>
+            <a href="#contract">Protocol contract</a>
             <a href="#status">Status codes</a>
-            <a href="#agent">Pay with your agent</a>
+            <a href="#agent">Pay with an agent</a>
           </nav>
         </aside>
 
         <main className="docs-main">
           <section className="docs-hero" id="quickstart">
             <div className="section-kicker">AgentPay quickstart</div>
-            <h1 aria-label="Add a 402 payment gate to any route.">Add a 402 payment gate<br /><em>to any route.</em></h1>
+            <h1 aria-label="Standard x402 payments from any capable agent.">
+              Standard x402 payments<br /><em>from any capable agent.</em>
+            </h1>
             <p>
-              Wrap an Express route with <code>paymentMiddleware</code>. Agents that call it without a
-              payment header receive an HTTP 402 body with the exact price, network, and recipient;
-              after paying, they retry with <code>X-Payment-Tx</code> and the middleware verifies the
-              receipt before your handler runs.
+              AgentPay exposes an ordinary x402 v2 resource on Base Mainnet. A compatible client
+              reads the standard quote, signs an exact 0.01 USDC authorization, and receives the
+              resource only after the server verifies and settles it.
             </p>
           </section>
 
@@ -102,26 +102,26 @@ export function DocsPage() {
             <div className="docs-section-number">01</div>
             <div className="docs-section-content">
               <div className="docs-icon"><Package aria-hidden="true" /></div>
-              <h2>Install the server package</h2>
+              <h2>Use the official x402 client</h2>
               <p>
-                <code>@x402/server</code> is framework-agnostic verification plus an Express adapter.
-                It requires <code>viem</code> as a dependency.
+                No AgentPay buyer SDK is required. The official x402 client creates a gasless
+                EIP-3009 USDC authorization; the buyer needs USDC but no buyer RPC or ETH.
               </p>
               <CodeBlock label="Terminal" code={installCommand} />
             </div>
           </section>
 
-          <section className="docs-section" id="middleware">
+          <section className="docs-section" id="client">
             <div className="docs-section-number">02</div>
             <div className="docs-section-content">
               <div className="docs-icon"><Code2 aria-hidden="true" /></div>
-              <h2>Guard a route with the middleware</h2>
+              <h2>Fetch the protected resource</h2>
               <p>
-                Place <code>paymentMiddleware</code> between the URL matcher and your handler. Without a
-                <code>X-Payment-Tx</code> header it returns <code>402</code>; with a valid receipt it calls
-                <code>next()</code> and your handler runs normally.
+                Register the official <code>exact</code> EVM scheme and wrap standard
+                <code>fetch</code>. Apply your own origin, asset, recipient and maximum-spend
+                policy before allowing an autonomous agent to sign.
               </p>
-              <CodeBlock label="TypeScript" code={middlewareExample} />
+              <CodeBlock label="TypeScript" code={clientExample} />
             </div>
           </section>
 
@@ -129,15 +129,19 @@ export function DocsPage() {
             <div className="docs-section-number">03</div>
             <div className="docs-section-content">
               <div className="docs-icon"><CircleX aria-hidden="true" /></div>
-              <h2>The 402 payment requirement</h2>
+              <h2>The standard HTTP contract</h2>
               <p>
-                An unauthenticated request never reaches your data. It receives exact payment terms an
-                agent can act on: price in USDC (6-decimal base units), your recipient, and the chain.
+                The JSON body stays intentionally compact. Machine-readable resource, asset,
+                recipient, amount and timeout terms travel in the canonical header.
               </p>
-              <CodeBlock label="Live 402 response" code={paymentRequired} />
-              <h3>Paid request</h3>
-              <p>The agent pays and retries the same URL with the receipt hash in <code>X-Payment-Tx</code>.</p>
-              <CodeBlock label="Terminal" code={paidRequest} />
+              <CodeBlock label="Unpaid response" code={paymentRequired} />
+              <h3>Three standard headers</h3>
+              <CodeBlock label="x402 v2" code={protocolHeaders} />
+              <p className="docs-footnote">
+                AgentPay runs a self-hosted facilitator on the same server. Its dedicated
+                gas sponsor submits the USDC authorization on Base; it cannot change the signed
+                amount or recipient.
+              </p>
             </div>
           </section>
 
@@ -146,7 +150,7 @@ export function DocsPage() {
             <div className="docs-section-content">
               <div className="docs-icon"><ServerCog aria-hidden="true" /></div>
               <h2>Status codes</h2>
-              <p>The middleware&apos;s response contract for every request to a guarded route.</p>
+              <p>The public, fail-closed response contract for the protected route.</p>
               <div className="docs-table-wrap">
                 <table>
                   <thead><tr><th>Status</th><th>Meaning</th><th>Client action</th></tr></thead>
@@ -158,10 +162,9 @@ export function DocsPage() {
                 </table>
               </div>
               <p className="docs-footnote">
-                The middleware accepts an official-USDC <code>Transfer</code> receipt on the configured
-                chain, waits for one confirmation by default, and mounts an in-memory replay claim per
-                transaction hash. Raise <code>confirmations</code> and supply durable replay storage for
-                production traffic.
+                Authorization state is locked in Redis across verify, handler execution and
+                settlement. Consumed signatures never act as public bearer tokens, and AgentPay
+                never caches or replays the paid response body.
               </p>
             </div>
           </section>
@@ -170,18 +173,18 @@ export function DocsPage() {
             <div className="docs-section-number">05</div>
             <div className="docs-section-content">
               <div className="docs-icon"><Bot aria-hidden="true" /></div>
-              <h2>Pay with your own AI agent</h2>
+              <h2>Pay with any capable agent</h2>
               <p>
-                Give your agent a task to pay the live <code>AgentPay</code> endpoint and fetch the
-                premium data. Replace <code>[INSERT_PRIVATE_KEY]</code> with the private key your agent
-                should pay from, then paste the prompt into any capable AI agent.
+                The prompt is enough for an agent that can execute code and make outbound HTTPS requests,
+                using an installed or temporary x402 client. A text-only agent cannot access a wallet
+                or perform the payment by itself.
               </p>
               <CodeBlock label="Agent prompt" code={agentPrompt} />
               <div className="docs-warning docs-warning--danger">
                 <ShieldAlert aria-hidden="true" />
                 <div>
                   <strong>REAL FUNDS · BASE MAINNET</strong>
-                  <span>The agent transfers real USDC. Use a dedicated low-balance wallet key, never your main key.</span>
+                  <span>Use a new dedicated low-balance wallet. Never paste a primary or previously shared key.</span>
                 </div>
               </div>
             </div>

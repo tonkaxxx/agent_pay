@@ -4,7 +4,7 @@ import { DocsPage } from "@/components/docs-page";
 
 export const metadata: Metadata = {
   title: "Developer Docs — AgentPay",
-  description: "Add an HTTP 402 USDC payment gate to any API route with @x402/server paymentMiddleware.",
+  description: "Use standard x402 v2 clients to pay AgentPay's Base Mainnet USDC API.",
 };
 
 export default function DocumentationPage() {
