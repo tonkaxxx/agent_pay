@@ -1,6 +1,5 @@
 import {
-  BASE_NETWORK,
-  BASE_USDC,
+  PREMIUM_PAYMENT_POLICY,
   RedisAuthorizationStore,
   createAgentPayResourceServer,
   createPremiumRoute,
@@ -66,10 +65,10 @@ export function buildPremiumHandler(
       store: dependencies.createStore(redis),
       policy: {
         resource: config.resourceUrl,
-        network: BASE_NETWORK,
-        asset: BASE_USDC,
+        network: PREMIUM_PAYMENT_POLICY.network,
+        asset: PREMIUM_PAYMENT_POLICY.asset,
         payTo: config.payTo,
-        amount: "10000",
+        amount: PREMIUM_PAYMENT_POLICY.amountAtomic,
       },
     },
   );

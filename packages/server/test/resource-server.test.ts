@@ -4,6 +4,7 @@ import { expect, test, vi } from "vitest";
 import {
   BASE_NETWORK,
   BASE_USDC,
+  PREMIUM_PAYMENT_POLICY,
   createAgentPayResourceServer,
   createPremiumRoute,
 } from "../src/index.js";
@@ -34,15 +35,26 @@ test("registers only the Base Mainnet exact server scheme", async () => {
 });
 
 test("builds the canonical compact premium route without extensions", async () => {
+  expect(Object.isFrozen(PREMIUM_PAYMENT_POLICY)).toBe(true);
+  expect(PREMIUM_PAYMENT_POLICY).toEqual({
+    scheme: "exact",
+    network: "eip155:8453",
+    asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    amountAtomic: "10000",
+    amountUsdc: "0.01",
+    price: "$0.01",
+    maxTimeoutSeconds: 300,
+  });
+
   const route = createPremiumRoute(PAY_TO, RESOURCE);
 
   expect(route).toEqual({
     accepts: {
-      scheme: "exact",
-      network: "eip155:8453",
-      price: "$0.01",
+      scheme: PREMIUM_PAYMENT_POLICY.scheme,
+      network: PREMIUM_PAYMENT_POLICY.network,
+      price: PREMIUM_PAYMENT_POLICY.price,
       payTo: PAY_TO,
-      maxTimeoutSeconds: 300,
+      maxTimeoutSeconds: PREMIUM_PAYMENT_POLICY.maxTimeoutSeconds,
     },
     resource: "https://agentpay.example/api/premium",
     description: "AgentPay premium API",
@@ -55,11 +67,11 @@ test("builds the canonical compact premium route without extensions", async () =
   const unpaid = await route.unpaidResponseBody?.({} as never);
   expect(unpaid).toEqual({
     contentType: "application/json",
-    body: {
-      error: "Payment Required",
-      x402Version: 2,
-      priceUsdc: "0.01",
-      network: "eip155:8453",
+      body: {
+        error: "Payment Required",
+        x402Version: 2,
+        priceUsdc: PREMIUM_PAYMENT_POLICY.amountUsdc,
+        network: PREMIUM_PAYMENT_POLICY.network,
     },
   });
   expect(JSON.stringify(unpaid)).not.toContain("premiumData");

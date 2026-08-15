@@ -1,4 +1,5 @@
 import {
+  PREMIUM_PAYMENT_POLICY,
   RedisAuthorizationStore,
   createAgentPayResourceServer,
   createPremiumRoute,
@@ -59,10 +60,10 @@ test("composes official x402 protection before the authorization guard", () => {
       store,
       policy: {
         resource: config.resourceUrl,
-        network: "eip155:8453",
-        asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        network: PREMIUM_PAYMENT_POLICY.network,
+        asset: PREMIUM_PAYMENT_POLICY.asset,
         payTo: config.payTo,
-        amount: "10000",
+        amount: PREMIUM_PAYMENT_POLICY.amountAtomic,
       },
     },
   );

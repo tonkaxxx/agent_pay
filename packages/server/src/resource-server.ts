@@ -6,8 +6,12 @@ import {
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { getAddress, type Address } from "viem";
 
-export const BASE_NETWORK = "eip155:8453" as const;
-export const BASE_USDC: Address = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+import {
+  BASE_NETWORK,
+  PREMIUM_PAYMENT_POLICY,
+} from "./payment-policy.js";
+
+export { BASE_NETWORK, BASE_USDC } from "./payment-policy.js";
 
 export function createAgentPayResourceServer(
   facilitator: FacilitatorClient,
@@ -47,11 +51,11 @@ export function createPremiumRoute(payTo: Address, resource: string): RouteConfi
 
   return {
     accepts: {
-      scheme: "exact",
-      network: BASE_NETWORK,
-      price: "$0.01",
+      scheme: PREMIUM_PAYMENT_POLICY.scheme,
+      network: PREMIUM_PAYMENT_POLICY.network,
+      price: PREMIUM_PAYMENT_POLICY.price,
       payTo: recipient,
-      maxTimeoutSeconds: 300,
+      maxTimeoutSeconds: PREMIUM_PAYMENT_POLICY.maxTimeoutSeconds,
     },
     resource: canonicalResource(resource),
     description: "AgentPay premium API",
@@ -61,8 +65,8 @@ export function createPremiumRoute(payTo: Address, resource: string): RouteConfi
       body: {
         error: "Payment Required",
         x402Version: 2,
-        priceUsdc: "0.01",
-        network: BASE_NETWORK,
+        priceUsdc: PREMIUM_PAYMENT_POLICY.amountUsdc,
+        network: PREMIUM_PAYMENT_POLICY.network,
       },
     }),
     settlementFailedResponseBody: () => ({

@@ -1,9 +1,12 @@
 export {
-  BASE_NETWORK,
-  BASE_USDC,
   createAgentPayResourceServer,
   createPremiumRoute,
 } from "./resource-server.js";
+export {
+  BASE_NETWORK,
+  BASE_USDC,
+  PREMIUM_PAYMENT_POLICY,
+} from "./payment-policy.js";
 export {
   InvalidAuthorizationError,
   authorizationFingerprint,
