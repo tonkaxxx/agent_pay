@@ -15,10 +15,10 @@ import {
 import type { x402ResourceServer } from "@x402/core/server";
 import { withX402 } from "@x402/next";
 import type { NextRequest, NextResponse } from "next/server";
-import { createClient } from "redis";
 
 import type { PremiumConfig } from "./config";
 import { createPremiumHandler } from "./handler";
+import { createAuthorizationRedisClient } from "./redis-client";
 
 interface PremiumRuntimeDependencies {
   createFacilitator(config: { url: string; timeoutMs: number }): FacilitatorClient;
@@ -39,7 +39,8 @@ const defaultDependencies: PremiumRuntimeDependencies = {
   createFacilitator: config => new HTTPFacilitatorClient(config),
   createServer: createAgentPayResourceServer,
   createRoute: createPremiumRoute,
-  createRedisClient: redisUrl => createClient({ url: redisUrl }) as unknown as RedisEvalClient,
+  createRedisClient: redisUrl =>
+    createAuthorizationRedisClient(redisUrl) as unknown as RedisEvalClient,
   createStore: redis => new RedisAuthorizationStore(redis),
   createPaidHandler: createPremiumHandler,
   protect: withX402,
