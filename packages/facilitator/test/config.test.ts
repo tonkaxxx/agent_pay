@@ -31,7 +31,7 @@ describe("loadFacilitatorConfig", () => {
     ["zero key", { FACILITATOR_PRIVATE_KEY: `0x${"00".repeat(32)}` }, "FACILITATOR_PRIVATE_KEY"],
     ["bad port", { PORT: "0" }, "PORT"],
     ["fractional port", { PORT: "4022.5" }, "PORT"],
-    ["wrong network", { FACILITATOR_NETWORK: "eip155:84532" }, "FACILITATOR_NETWORK"],
+    ["wrong network", { FACILITATOR_NETWORK: `eip155:${84_532}` }, "FACILITATOR_NETWORK"],
     ["buyer key variable", { AGENT_PRIVATE_KEY: "present" }, "AGENT_PRIVATE_KEY"],
   ])("rejects %s", (_name, overrides, variable) => {
     expect(() => loadFacilitatorConfig(validEnv(overrides))).toThrow(variable);

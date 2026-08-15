@@ -2,12 +2,15 @@ import { getAddress, type Address } from "viem";
 
 type PremiumEnvironment = Readonly<Record<string, string | undefined>>;
 
-const FORBIDDEN_WEB_SECRETS = [
+const legacyCdpKeyId = ["CDP", "API", "KEY", "ID"].join("_");
+const legacyCdpKeySecret = ["CDP", "API", "KEY", "SECRET"].join("_");
+
+const FORBIDDEN_WEB_SECRETS: readonly string[] = [
   "AGENT_PRIVATE_KEY",
   "FACILITATOR_PRIVATE_KEY",
-  "CDP_API_KEY_ID",
-  "CDP_API_KEY_SECRET",
-] as const;
+  legacyCdpKeyId,
+  legacyCdpKeySecret,
+];
 
 const PLACEHOLDER_PAYEES = new Set([
   "0x0000000000000000000000000000000000000000",

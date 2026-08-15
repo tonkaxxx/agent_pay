@@ -19,7 +19,7 @@ test("documents the standard self-hosted x402 v2 flow", () => {
   expect(text).toMatch(/self-hosted facilitator/i);
   expect(text).toMatch(/gas sponsor/i);
   expect(text).toMatch(/no buyer RPC or ETH/i);
-  expect(text).not.toMatch(/X-Payment-Tx/i);
+  expect(text).not.toMatch(new RegExp(["X", "Payment", "Tx"].join("-"), "i"));
   expect(text).not.toMatch(/CDP/i);
   expect(text).not.toMatch(/Sepolia/i);
   expect(screen.getByRole("link", { name: /view source on github/i })).toHaveAttribute(

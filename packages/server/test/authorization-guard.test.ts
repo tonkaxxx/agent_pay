@@ -121,17 +121,23 @@ test.each([
   expect(bodyText).not.toContain("premiumData");
 });
 
-test("rejects a concurrent duplicate while the first request holds the lease", async () => {
+test("settles one concurrent request and rejects pending and consumed replays", async () => {
   let finish!: (response: Response) => void;
   const blocked = new Promise<Response>(resolve => { finish = resolve; });
-  let acquired = false;
+  let state: "empty" | "pending" | "consumed" = "empty";
   const lock = store({
     acquire: vi.fn().mockImplementation(async () => {
-      if (acquired) return "pending";
-      acquired = true;
+      if (state !== "empty") return state;
+      state = "pending";
       return "acquired";
     }),
+    consume: vi.fn().mockImplementation(async () => {
+      if (state !== "pending") return false;
+      state = "consumed";
+      return true;
+    }),
   });
+  const settle = vi.fn(() => paidResponse());
   const handler = vi.fn().mockReturnValue(blocked);
   const guarded = withAuthorizationLock(handler, { store: lock, policy });
 
@@ -140,9 +146,25 @@ test("rejects a concurrent duplicate while the first request holds the lease", a
   const second = await guarded(paidRequest());
 
   expect(second.status).toBe(409);
+  await expect(second.json()).resolves.toEqual({
+    error: "Conflict",
+    reason: "payment_in_progress",
+  });
   expect(handler).toHaveBeenCalledOnce();
-  finish(paidResponse());
+  finish(settle());
   await expect(first).resolves.toMatchObject({ status: 200 });
+  expect(settle).toHaveBeenCalledOnce();
+
+  const replay = await guarded(paidRequest());
+  expect(replay.status).toBe(409);
+  const replayText = await replay.clone().text();
+  await expect(replay.json()).resolves.toEqual({
+    error: "Conflict",
+    reason: "payment_consumed",
+  });
+  expect(replayText).not.toContain("premiumData");
+  expect(handler).toHaveBeenCalledOnce();
+  expect(settle).toHaveBeenCalledOnce();
 });
 
 test("releases failed verification and settlement attempts", async () => {

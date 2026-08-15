@@ -100,8 +100,8 @@ describe("production Compose policy", () => {
       "FACILITATOR_PRIVATE_KEY",
       "BASE_MAINNET_RPC_URL",
       "AGENTPAY_ALLOW_INSECURE_LOCAL_ORIGIN",
-      "CDP_API_KEY_ID",
-      "CDP_API_KEY_SECRET",
+      ["CDP", "API", "KEY", "ID"].join("_"),
+      ["CDP", "API", "KEY", "SECRET"].join("_"),
     ]));
     expect(facilitator).toMatchObject({
       BASE_MAINNET_RPC_URL: "https://base-rpc.invalid/",

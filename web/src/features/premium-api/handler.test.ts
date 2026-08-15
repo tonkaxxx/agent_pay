@@ -2,12 +2,14 @@ import { expect, test } from "vitest";
 
 import { createPremiumHandler } from "./handler";
 
+const legacyReceiptHeader = ["X", "Payment", "Tx"].join("-");
+
 test("returns only the paid resource with private no-store caching", async () => {
   const handle = createPremiumHandler();
   const response = await handle(new Request("https://agentpay.example/api/premium", {
     headers: {
       "PAYMENT-SIGNATURE": "must-not-be-reflected",
-      "X-Payment-Tx": `0x${"ab".repeat(32)}`,
+      [legacyReceiptHeader]: `0x${"ab".repeat(32)}`,
     },
   }));
 

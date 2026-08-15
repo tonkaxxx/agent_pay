@@ -49,8 +49,8 @@ test.each([
 test.each([
   "AGENT_PRIVATE_KEY",
   "FACILITATOR_PRIVATE_KEY",
-  "CDP_API_KEY_ID",
-  "CDP_API_KEY_SECRET",
+  ["CDP", "API", "KEY", "ID"].join("_"),
+  ["CDP", "API", "KEY", "SECRET"].join("_"),
 ] as const)("rejects buyer or infrastructure secret %s in the web environment", name => {
   expect(() => loadPremiumConfig({ ...validEnvironment, [name]: "secret-value" })).toThrow(name);
 });

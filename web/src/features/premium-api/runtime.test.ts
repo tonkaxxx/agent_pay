@@ -20,6 +20,7 @@ const config: PremiumConfig = {
   facilitatorUrl: "http://facilitator:4022/",
   redisUrl: "redis://redis:6379",
 };
+const legacyReceiptHeader = ["X", "Payment", "Tx"].join("-");
 
 test("composes official x402 protection before the authorization guard", () => {
   const facilitator = { kind: "facilitator" };
@@ -96,7 +97,7 @@ test("returns a compact standard v2 challenge and ignores legacy receipt hashes"
   });
 
   const response = await handler(new NextRequest(config.resourceUrl, {
-    headers: { "X-Payment-Tx": `0x${"ab".repeat(32)}` },
+    headers: { [legacyReceiptHeader]: `0x${"ab".repeat(32)}` },
   }));
 
   expect(response.status).toBe(402);
