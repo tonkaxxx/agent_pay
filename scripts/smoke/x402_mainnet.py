@@ -106,6 +106,22 @@ def load_private_key() -> str:
     return value
 
 
+def assert_consumed_replay(response: requests.Response) -> None:
+    """Require a stable consumed response and reject any protected-content replay."""
+    try:
+        body = response.json()
+    except requests.JSONDecodeError as error:
+        raise RuntimeError("replay_protection_failed") from error
+    if (
+        response.status_code != 409
+        or set(body) != {"error", "reason"}
+        or body.get("error") != "Conflict"
+        or body.get("reason") != "payment_consumed"
+        or "premiumData" in response.text
+    ):
+        raise RuntimeError("replay_protection_failed")
+
+
 def main() -> None:
     """Preview safely; pay only when both irreversible-action gates are present."""
     api_url = canonical_api_url(os.environ.get("API_URL", DEFAULT_API_URL))
@@ -141,10 +157,25 @@ def main() -> None:
         settlement = http_client.get_payment_settle_response(response.headers.get)
         if not settlement.success or not settlement.transaction:
             raise RuntimeError("settlement_failed")
+        payment_signature = response.request.headers.get("PAYMENT-SIGNATURE")
+        if not payment_signature:
+            raise RuntimeError("payment_signature_missing")
+        data = response.json()
+        replay = requests.get(
+            api_url,
+            headers={
+                "Accept": "application/json",
+                "PAYMENT-SIGNATURE": payment_signature,
+            },
+            allow_redirects=False,
+            timeout=30,
+        )
+        assert_consumed_replay(replay)
         print(json.dumps({
             "status": response.status_code,
             "transaction": settlement.transaction,
-            "data": response.json(),
+            "data": data,
+            "replay": "payment_consumed",
         }, separators=(",", ":")))
 
 

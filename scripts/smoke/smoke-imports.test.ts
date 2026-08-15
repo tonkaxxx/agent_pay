@@ -47,6 +47,8 @@ test("uses only official clean-room x402 clients", () => {
   expect(python).toContain("from x402 import x402ClientSync");
   expect(python).toContain("from x402.http.clients import x402_requests");
   expect(python).toContain("from x402.mechanisms.evm import EthAccountSigner");
+  expect(python).toContain('"PAYMENT-SIGNATURE": payment_signature');
+  expect(python).toContain('"replay": "payment_consumed"');
   expect(python).not.toMatch(/agentpay[._-](?:client|sdk|package)/i);
 
   expect(requirements.trim().split("\n")).toEqual([
