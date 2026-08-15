@@ -40,6 +40,14 @@ function stableError(
   });
 }
 
+function failure(
+  log: PremiumRouteDependencies["log"],
+  entry: PremiumRouteLog,
+): Response {
+  log(entry);
+  return stableError(entry.requestId, entry.status, entry.reason);
+}
+
 async function hasSettlementFailure(response: Response): Promise<boolean> {
   if (response.status !== 402 && response.status !== 502) return false;
   try {
@@ -71,8 +79,7 @@ export function createPremiumRoute(
         status: 503,
         reason: "configuration_unavailable",
       } as const;
-      log(entry);
-      return stableError(requestId, entry.status, entry.reason);
+      return failure(log, entry);
     }
 
     let response: Response;
@@ -86,8 +93,7 @@ export function createPremiumRoute(
         status: 503,
         reason: "payment_infrastructure_unavailable",
       } as const;
-      log(entry);
-      return stableError(requestId, entry.status, entry.reason);
+      return failure(log, entry);
     }
 
     if (await hasSettlementFailure(response)) {
@@ -98,8 +104,7 @@ export function createPremiumRoute(
         status: 502,
         reason: "settlement_failed",
       } as const;
-      log(entry);
-      return stableError(requestId, entry.status, entry.reason);
+      return failure(log, entry);
     }
 
     if (response.status === 402 && response.headers.has("PAYMENT-REQUIRED")) {
@@ -113,8 +118,7 @@ export function createPremiumRoute(
         status: 503,
         reason: "payment_infrastructure_unavailable",
       } as const;
-      log(entry);
-      return stableError(requestId, entry.status, entry.reason);
+      return failure(log, entry);
     }
     return response;
   };
