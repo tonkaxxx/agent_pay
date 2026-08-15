@@ -18,3 +18,9 @@ export type {
   PaymentMiddlewareOptions,
   PaymentRequiredPayload,
 } from "./middleware.js";
+export {
+  BASE_NETWORK,
+  BASE_USDC,
+  createAgentPayResourceServer,
+  createPremiumRoute,
+} from "./resource-server.js";
