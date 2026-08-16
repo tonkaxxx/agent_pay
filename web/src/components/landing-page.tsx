@@ -80,6 +80,7 @@ export function LandingPage() {
           <a href="#protocol">Protocol</a>
           <a href="#live-api">Live API</a>
           <Link href="/docs">Docs <ArrowUpRight aria-hidden="true" /></Link>
+          <Link href="/login">Sell an API <ArrowUpRight aria-hidden="true" /></Link>
         </nav>
         <a className="header-cta" href={founderMail}>
           Talk to the founder <ArrowUpRight aria-hidden="true" />
@@ -106,6 +107,9 @@ export function LandingPage() {
               </a>
               <Link className="button button--secondary" href="/docs">
                 Read the docs <ArrowUpRight aria-hidden="true" />
+              </Link>
+              <Link className="button button--primary" href="/login">
+                Start selling your API <ArrowUpRight aria-hidden="true" />
               </Link>
             </div>
           </div>
@@ -238,6 +242,7 @@ export function LandingPage() {
             GitHub
           </a>
           <Link href="/docs">Docs</Link>
+          <Link href="/login">Sell an API</Link>
           <a href={founderMail}>Contact</a>
         </div>
         <div className="footer-bottom"><span>© 2026 AgentPay</span><span>Base Mainnet · USDC · HTTP 402</span></div>

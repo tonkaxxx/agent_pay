@@ -1,15 +1,19 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { TestDatabase } from "@/db/test-db";
-import { createTestDatabase } from "@/db/test-db";
+import { createTestDatabase, resetTestDatabase } from "@/db/test-db";
 
 let tdb: TestDatabase;
 
-beforeEach(async () => {
+beforeAll(async () => {
   tdb = await createTestDatabase();
 });
 
-afterEach(async () => {
+beforeEach(async () => {
+  await resetTestDatabase(tdb);
+});
+
+afterAll(async () => {
   await tdb.close();
 });
 

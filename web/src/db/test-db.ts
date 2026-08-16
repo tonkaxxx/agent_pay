@@ -26,3 +26,9 @@ export async function createTestDatabase(): Promise<TestDatabase> {
     close: () => sql.close(),
   };
 }
+
+export async function resetTestDatabase(tdb: TestDatabase): Promise<void> {
+  await tdb.sql.exec(
+    'TRUNCATE TABLE account, audit_event, authenticator, merchant_endpoint, payment_event, session, "user", "verificationToken" RESTART IDENTITY CASCADE',
+  );
+}

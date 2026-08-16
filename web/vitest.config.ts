@@ -8,11 +8,17 @@ export default defineConfig({
       "@": new URL("./src", import.meta.url).pathname,
       "@agentpay/server": new URL("../packages/server/src/index.ts", import.meta.url).pathname,
       "next/server": new URL("./node_modules/next/server.js", import.meta.url).pathname,
+      "next/headers": new URL("./node_modules/next/headers.js", import.meta.url).pathname,
+      "next/navigation": new URL("./node_modules/next/navigation.js", import.meta.url).pathname,
     },
   },
   test: {
     environment: "jsdom",
-    server: { deps: { inline: ["@x402/next"] } },
+    server: {
+      deps: {
+        inline: ["@x402/next", "next-auth", "@auth/core", "@auth/drizzle-adapter"],
+      },
+    },
     setupFiles: ["./vitest.setup.ts"],
     include: [
       "src/**/*.test.{ts,tsx}",

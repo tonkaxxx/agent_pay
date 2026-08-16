@@ -1,16 +1,20 @@
 import { migrate as pgliteMigrate } from "drizzle-orm/pglite/migrator";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { applyMigrations, migrationsFolder, migrationsSchema, migrationsTable } from "@/db/migrate";
-import { createTestDatabase, type TestDatabase } from "@/db/test-db";
+import { createTestDatabase, resetTestDatabase, type TestDatabase } from "@/db/test-db";
 
 let tdb: TestDatabase;
 
-beforeEach(async () => {
+beforeAll(async () => {
   tdb = await createTestDatabase();
 });
 
-afterEach(async () => {
+beforeEach(async () => {
+  await resetTestDatabase(tdb);
+});
+
+afterAll(async () => {
   await tdb.close();
 });
 
