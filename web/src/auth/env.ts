@@ -190,6 +190,14 @@ export function loadAuthEnvironment(
     }
   }
 
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return {
+      secret: "agentpay-build-placeholder-secret-not-usable-at-runtime",
+      url: "https://placeholder.invalid/",
+      trustHost: false,
+    };
+  }
+
   const github = parseOAuthPair(
     environment,
     "AUTH_GITHUB_ID",
@@ -212,7 +220,10 @@ export function loadAuthEnvironment(
   if (github === undefined && email === undefined) {
     throw configurationError("AUTH_GITHUB_ID");
   }
-  if (environment.NODE_ENV === "production" && (github === undefined || email === undefined)) {
+  if (
+    environment.NODE_ENV === "production" &&
+    (github === undefined || email === undefined)
+  ) {
     throw configurationError("AUTH_GITHUB_ID");
   }
 
