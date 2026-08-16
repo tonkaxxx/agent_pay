@@ -140,8 +140,9 @@
 
 **Files:**
 - Create: `web/src/features/gateway/secrets.ts`
+- Create: `web/src/features/gateway/env.ts` (parses `AGENTPAY_MASTER_KEY`, `AGENTPAY_MASTER_KEY_VERSION`)
 - Create: `web/src/features/gateway/secrets.test.ts`
-- Modify: `web/src/auth/env.ts` (parse `AGENTPAY_MASTER_KEY`, `AGENTPAY_MASTER_KEY_VERSION`)
+- Modify: ~~`web/src/auth/env.ts`~~ (moved to a dedicated `gateway/env.ts` so gateway code does not depend on the heavy Auth.js module graph)
 
 **Interfaces:**
 - Produces: `EncryptedSecret = { keyVersion; iv; authTag; ciphertext }`.
