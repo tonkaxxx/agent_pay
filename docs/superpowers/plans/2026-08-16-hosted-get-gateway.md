@@ -231,12 +231,14 @@
 - Produces: `createGatewayRoute(...)` composing `guard(withAuthorizationLock)` around `withX402(handler, route, sharedServer, undefined, undefined, false)`.
 - Public errors (stable JSON + `Cache-Control: private, no-store`, `X-Request-ID` on infra errors): `402 payment_required`, `404 endpoint_not_found`, `409 payment_in_progress`/`payment_consumed`, `502 upstream_unavailable`/`settlement_failed`, `503 payment_infrastructure_unavailable`/`gateway_configuration_unavailable`.
 
-- [ ] **Step 1: Failing server-package policy/route tests** (`createPaymentPolicy` validation; `createResourceRoute` parity with premium fields; `createPremiumRoute` output unchanged)
-- [ ] **Step 2: Implement server-package policy + route generalization** (keep premium fixture)
-- [ ] **Step 3: Failing gateway integration tests then implement route/handler/policy**
+- [x] **Step 1: Failing server-package policy/route tests** (`createPaymentPolicy` validation; `createResourceRoute` parity with premium fields; `createPremiumRoute` output unchanged)
+- [x] **Step 2: Implement server-package policy + route generalization** (keep premium fixture)
+- [x] **Step 3: Failing gateway integration tests then implement route/handler/policy**
   Unpaid 402; valid signed request calls upstream exactly once; concurrent duplicate calls upstream exactly once; upstream failures (`3xx/4xx/5xx/timeout/oversize`) never settle; successful settlement returns the body + standard header; paused/unknown/draft indistinguishable `404`; no secrets or bodies in logs.
-- [ ] **Step 4: GREEN + full package + web tests**
-- [ ] **Step 5: Commit** `git add -A && git commit -m "feat: add multi-tenant hosted GET gateway"`
+- [x] **Step 4: GREEN + full package + web tests**
+- [x] **Step 5: Commit** `git add -A && git commit -m "feat: add multi-tenant hosted GET gateway"`
+
+Implementation notes (commit `723c9dd`): server generalization landed as `createPaymentPolicy` (validates amount 1..1e9 atomic, checksummed payTo, positive timeout, description; `canonicalResource` moved into `payment-policy.ts`), `createResourceRoute(policy)` producing the `RouteConfig` with unpaid/settlement-failed JSON callbacks, and `authorizationPolicyFromPolicy` deriving the Redis `AuthorizationPolicy`. `createPremiumRoute` delegates through the same builders with `PREMIUM_PAYMENT_POLICY`; premium route output tests assert byte-compatible behavior. Web side: `web/src/features/gateway/policy.ts` (`buildGatewayPolicy`, resource `siteUrl/g/<publicId>`, maxTimeoutSeconds 300), `gateway-config.ts` (required `NEXT_PUBLIC_SITE_URL`/`FACILITATOR_URL`/`REDIS_URL`; production rejects local origins without `AGENTPAY_ALLOW_INSECURE_LOCAL_ORIGIN=true`; forbids `AGENT_PRIVATE_KEY`/`FACILITATOR_PRIVATE_KEY`/CDP secrets in the web runtime), `gateway-handler.ts` (one bounded upstream GET; 2xx → body with allowlisted Content-Type/Content-Length + `Cache-Control: private, no-store`; any failure → 502 `upstream_unavailable` so `withX402` never settles), `gateway-route.ts` (dependency-injected composition: lookup → shared infra → policy → handler → `guard(protect(...))`; stable errors logged with `{requestId, publicId, stage, status, reason}` and `X-Request-ID`; `settlement_failed` from a 402/502 body maps to 502), `shared/payment-infrastructure.ts` (lazy shared singleton: `HTTPFacilitatorClient` + `createAgentPayResourceServer` + `RedisAuthorizationStore` from `FACILITATOR_URL`/`REDIS_URL`; `resetSharedGatewayInfrastructure()` for tests), `gateway-runtime.ts` (production wiring: DB `findActiveByPublicId`, lazy `decryptEndpointCredential`, `withX402` + `withAuthorizationLock`), and `web/src/app/g/[publicId]/route.ts` (`nodejs`/`force-dynamic`, cached runtime factory). Note: full onchain/Redis integration tests deferred to Task 9; Task 6 covered composition via unit tests (28 new web tests, 54 server tests).
 
 ---
 
