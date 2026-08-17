@@ -9,9 +9,12 @@ import { getAddress, type Address } from "viem";
 import {
   BASE_NETWORK,
   PREMIUM_PAYMENT_POLICY,
+  canonicalResource,
+  createPaymentPolicy,
+  type PaymentPolicy,
 } from "./payment-policy.js";
 
-export { BASE_NETWORK, BASE_USDC } from "./payment-policy.js";
+export { BASE_NETWORK, BASE_USDC, canonicalResource } from "./payment-policy.js";
 
 export function createAgentPayResourceServer(
   facilitator: FacilitatorClient,
@@ -22,23 +25,32 @@ export function createAgentPayResourceServer(
   );
 }
 
-function canonicalResource(resource: string): string {
-  let url: URL;
-  try {
-    url = new URL(resource);
-  } catch {
-    throw new TypeError("resource must be a canonical HTTP(S) URL.");
-  }
-  if (
-    (url.protocol !== "https:" && url.protocol !== "http:")
-    || url.username !== ""
-    || url.password !== ""
-    || url.hash !== ""
-    || url.href !== resource
-  ) {
-    throw new TypeError("resource must be a canonical HTTP(S) URL.");
-  }
-  return url.href;
+export function createResourceRoute(policy: PaymentPolicy): RouteConfig {
+  return {
+    accepts: {
+      scheme: policy.scheme,
+      network: policy.network,
+      price: policy.price,
+      payTo: policy.payTo,
+      maxTimeoutSeconds: policy.maxTimeoutSeconds,
+    },
+    resource: policy.resource,
+    description: policy.description,
+    mimeType: "application/json",
+    unpaidResponseBody: () => ({
+      contentType: "application/json",
+      body: {
+        error: "Payment Required",
+        x402Version: 2,
+        priceUsdc: policy.amountUsdc,
+        network: policy.network,
+      },
+    }),
+    settlementFailedResponseBody: () => ({
+      contentType: "application/json",
+      body: { error: "Bad Gateway", reason: "settlement_failed" },
+    }),
+  };
 }
 
 export function createPremiumRoute(payTo: Address, resource: string): RouteConfig {
@@ -49,29 +61,12 @@ export function createPremiumRoute(payTo: Address, resource: string): RouteConfi
     throw new TypeError("payTo must be a valid EVM address.");
   }
 
-  return {
-    accepts: {
-      scheme: PREMIUM_PAYMENT_POLICY.scheme,
-      network: PREMIUM_PAYMENT_POLICY.network,
-      price: PREMIUM_PAYMENT_POLICY.price,
-      payTo: recipient,
-      maxTimeoutSeconds: PREMIUM_PAYMENT_POLICY.maxTimeoutSeconds,
-    },
+  const policy = createPaymentPolicy({
     resource: canonicalResource(resource),
+    payTo: recipient,
+    amountAtomic: PREMIUM_PAYMENT_POLICY.amountAtomic,
+    maxTimeoutSeconds: PREMIUM_PAYMENT_POLICY.maxTimeoutSeconds,
     description: "AgentPay premium API",
-    mimeType: "application/json",
-    unpaidResponseBody: () => ({
-      contentType: "application/json",
-      body: {
-        error: "Payment Required",
-        x402Version: 2,
-        priceUsdc: PREMIUM_PAYMENT_POLICY.amountUsdc,
-        network: PREMIUM_PAYMENT_POLICY.network,
-      },
-    }),
-    settlementFailedResponseBody: () => ({
-      contentType: "application/json",
-      body: { error: "Bad Gateway", reason: "settlement_failed" },
-    }),
-  };
+  });
+  return createResourceRoute(policy);
 }

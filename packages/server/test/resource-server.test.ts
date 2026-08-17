@@ -6,7 +6,9 @@ import {
   BASE_USDC,
   PREMIUM_PAYMENT_POLICY,
   createAgentPayResourceServer,
+  createPaymentPolicy,
   createPremiumRoute,
+  createResourceRoute,
 } from "../src/index.js";
 
 const PAY_TO = "0x1111111111111111111111111111111111111111" as const;
@@ -90,4 +92,48 @@ test("rejects non-canonical resources and invalid recipients", () => {
   expect(() => createPremiumRoute("not-an-address" as never, RESOURCE)).toThrow(
     "payTo must be a valid EVM address",
   );
+});
+
+test("createResourceRoute builds a route from a validated policy", async () => {
+  const policy = createPaymentPolicy({
+    resource: RESOURCE,
+    payTo: PAY_TO,
+    amountAtomic: "1234500",
+    maxTimeoutSeconds: 300,
+    description: "Weather endpoint",
+  });
+
+  const route = createResourceRoute(policy);
+
+  expect(route).toEqual({
+    accepts: {
+      scheme: policy.scheme,
+      network: policy.network,
+      price: "$1.2345",
+      payTo: PAY_TO,
+      maxTimeoutSeconds: 300,
+    },
+    resource: RESOURCE,
+    description: "Weather endpoint",
+    mimeType: "application/json",
+    unpaidResponseBody: expect.any(Function),
+    settlementFailedResponseBody: expect.any(Function),
+  });
+
+  const unpaid = await route.unpaidResponseBody?.({} as never);
+  expect(unpaid).toEqual({
+    contentType: "application/json",
+    body: {
+      error: "Payment Required",
+      x402Version: 2,
+      priceUsdc: "1.2345",
+      network: "eip155:8453",
+    },
+  });
+
+  const failed = await route.settlementFailedResponseBody?.({} as never, {} as never);
+  expect(failed).toEqual({
+    contentType: "application/json",
+    body: { error: "Bad Gateway", reason: "settlement_failed" },
+  });
 });

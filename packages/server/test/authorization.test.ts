@@ -7,6 +7,8 @@ import {
   BASE_USDC,
   InvalidAuthorizationError,
   authorizationFingerprint,
+  authorizationPolicyFromPolicy,
+  createPaymentPolicy,
   type AuthorizationPolicy,
 } from "../src/index.js";
 
@@ -51,6 +53,39 @@ function payload(overrides: Partial<PaymentPayload> = {}): PaymentPayload {
     ...overrides,
   };
 }
+
+test("derives an authorization policy from a payment policy", () => {
+  const payment = createPaymentPolicy({
+    resource: RESOURCE,
+    payTo: PAY_TO,
+    amountAtomic: "10000",
+    maxTimeoutSeconds: 300,
+    description: "Weather endpoint",
+  });
+  expect(authorizationPolicyFromPolicy(payment)).toEqual({
+    resource: RESOURCE,
+    network: BASE_NETWORK,
+    asset: BASE_USDC,
+    payTo: PAY_TO,
+    amount: "10000",
+  });
+});
+
+test("a payment policy matches the fixture amounts", () => {
+  const payment = createPaymentPolicy({
+    resource: RESOURCE,
+    payTo: PAY_TO,
+    amountAtomic: "10000",
+    maxTimeoutSeconds: 300,
+    description: "Weather endpoint",
+  });
+  expect(payment.scheme).toBe("exact");
+  expect(payment.network).toBe(BASE_NETWORK);
+  expect(payment.asset).toBe(BASE_USDC);
+  expect(payment.amountAtomic).toBe("10000");
+  expect(payment.amountUsdc).toBe("0.01");
+  expect(payment.price).toBe("$0.01");
+});
 
 test("derives the same safe fingerprint from equivalent header encodings", () => {
   const value = payload();

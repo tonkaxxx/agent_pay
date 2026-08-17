@@ -4,6 +4,7 @@ import { decodePaymentSignatureHeader } from "@x402/core/http";
 import { getAddress, type Address } from "viem";
 
 import { BASE_NETWORK, BASE_USDC } from "./resource-server.js";
+import type { PaymentPolicy } from "./payment-policy.js";
 
 export interface AuthorizationPolicy {
   readonly resource: string;
@@ -11,6 +12,18 @@ export interface AuthorizationPolicy {
   readonly asset: Address;
   readonly payTo: Address;
   readonly amount: string;
+}
+
+export function authorizationPolicyFromPolicy(
+  policy: PaymentPolicy,
+): AuthorizationPolicy {
+  return {
+    resource: policy.resource,
+    network: policy.network,
+    asset: policy.asset,
+    payTo: policy.payTo,
+    amount: policy.amountAtomic,
+  };
 }
 
 export class InvalidAuthorizationError extends Error {
