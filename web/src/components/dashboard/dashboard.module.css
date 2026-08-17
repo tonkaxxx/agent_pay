@@ -176,6 +176,60 @@
   color: var(--muted);
 }
 
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  margin: 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.metricCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.metricCard .metricValue {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.metricCard .metricLabel {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.metricSpan {
+  grid-column: 1 / -1;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.recentFailures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recentFailures li {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--muted);
+}
+
 .gatewayUrl {
   display: flex;
   align-items: center;

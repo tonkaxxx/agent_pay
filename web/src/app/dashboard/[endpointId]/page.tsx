@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { auth } from "@/auth";
 import { EndpointDetails } from "@/components/dashboard/endpoint-details";
+import { MetricsDisplay } from "@/components/dashboard/metrics-display";
 import styles from "@/components/dashboard/dashboard.module.css";
 import { getDatabase } from "@/db";
 import {
@@ -13,6 +14,7 @@ import {
   setStatusAction,
   testConnectivityAction,
 } from "@/features/gateway/actions";
+import { metricsForEndpoint } from "@/features/gateway/metrics";
 import { getEndpointForOwner } from "@/features/gateway/repository";
 import { hasRecentSignIn } from "@/features/gateway/service";
 import { requireSeller } from "@/lib/dal";
@@ -42,6 +44,7 @@ export default async function EndpointDetailPage({
 
   const gatewayUrl = new URL(`/g/${endpoint.publicId}`, publicSiteUrl()).toString();
   const recent = await hasRecentSignIn({ sellerId: seller.id, db: db.db });
+  const metrics = await metricsForEndpoint(db.db, endpoint.id);
 
   return (
     <main className={styles.dashboard}>
@@ -63,6 +66,11 @@ export default async function EndpointDetailPage({
         priceAction={changePriceAction}
         connectivityAction={testConnectivityAction}
       />
+      <hr style={{ border: "1px solid var(--line)", margin: "28px 0" }} />
+      <h2 className="protocol-heading" style={{ margin: 0, fontSize: 28 }}>
+        Metrics
+      </h2>
+      <MetricsDisplay metrics={metrics} />
     </main>
   );
 }
