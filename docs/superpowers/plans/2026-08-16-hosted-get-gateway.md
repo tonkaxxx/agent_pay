@@ -256,9 +256,11 @@ Implementation notes (commit `723c9dd`): server generalization landed as `create
 - Produces: `metricsForEndpoint(...)`: paid count, GMV, commission, unique payers, repeated payers, upstream success rate, settlement success rate, median/p95 latency, recent safe error categories.
 - Produces: idempotent reconcile command accepting request id/endpoint id/tx hash, verifying onchain transfer, inserting a missing unique event.
 
-- [ ] **Step 1: Failing commission/metrics/events tests** (commission math; best-effort failure; unique constraints; aggregate queries on pglite)
-- [ ] **Step 2: Implement events/metrics + reconcile**
-- [ ] **Step 3: GREEN + commit** `git add -A && git commit -m "feat: persist payment events, commission, and metrics"`
+- [x] **Step 1: Failing commission/metrics/events tests** (commission math; best-effort failure; unique constraints; aggregate queries on pglite)
+- [x] **Step 2: Implement events/metrics + reconcile**
+- [x] **Step 3: GREEN + commit** `git add -A && git commit -m "feat: persist payment events, commission, and metrics"`
+
+Implementation notes (commit `fe89e16`): `events.ts` provides `recordSettlement(db, event, log)` best-effort insert (never throws; on DB failure logs `reconcile_needed request_id=… endpoint_id=… tx_hash=…`), `commissionAtomic` (5% of atomic amount, integer floor), and outcome-aware commission (commission only for `settled`). Idempotency enforced by a pre-insert uniqueness probe on fingerprint/txHash; failed/settled events are stored with distinct `outcome` values. `metrics.ts` aggregates `metricsForEndpoint`: paid count, GMV, commission, unique/repeated payers, upstream & settlement success rates (settlement_failed counts as upstream success), median/p95 upstream latency, and up to 10 recent safe failures. `web/scripts/reconcile-payment.mjs` (+`reconcile-payment.d.mts`) is an idempotent operator CLI (`--request-id --endpoint-id --tx-hash`, requires `DATABASE_URL` + `AGENTPAY_RPC_URL`) that verifies the Base receipt/transfer against the endpoint payTo/amount and inserts a missing settled event with commission; pure functions exported for tests. Dashboard detail page now renders a `MetricsDisplay` grid (GMV/commission/latency/rates/recent failures). A `DEBUG_GATEWAY_RECONCILE` note: recording settlement events into the request-critical path of `/g/[publicId]` route composition is deferred to Task 9 integration (lifecycle wiring with the x402 settlement response headers); the storage layer, CLI, and dashboard are complete and covered.
 
 ---
 
