@@ -5,6 +5,7 @@ import type { EndpointSummary } from "@/features/gateway/repository";
 import type { ActionState } from "@/features/gateway/actions";
 
 import { CopyField } from "./copy-field";
+import { ConnectivityForm } from "./connectivity-form";
 import { CredentialForm } from "./credential-form";
 import { MoneyForm } from "./money-form";
 import { StatusForm } from "./status-form";
@@ -32,6 +33,7 @@ export interface EndpointDetailsProps {
   readonly credentialAction: (previous: ActionState, formData: FormData) => Promise<ActionState>;
   readonly payoutAction: (previous: ActionState, formData: FormData) => Promise<ActionState>;
   readonly priceAction: (previous: ActionState, formData: FormData) => Promise<ActionState>;
+  readonly connectivityAction: (previous: ActionState, formData: FormData) => Promise<ActionState>;
 }
 
 export function EndpointDetails({
@@ -42,6 +44,7 @@ export function EndpointDetails({
   credentialAction,
   payoutAction,
   priceAction,
+  connectivityAction,
 }: EndpointDetailsProps) {
   const editable = endpoint.status !== "active";
   const armed = editable || recent;
@@ -138,6 +141,18 @@ export function EndpointDetails({
       <hr style={{ border: "1px solid var(--line)", margin: "28px 0" }} />
 
       <h2 className="protocol-heading" style={{ margin: 0, fontSize: 28 }}>
+        Upstream connectivity
+      </h2>
+
+      <p className={styles.hint}>
+        {lastTestText(endpoint)}
+      </p>
+
+      <ConnectivityForm endpointId={endpoint.id} action={connectivityAction} />
+
+      <hr style={{ border: "1px solid var(--line)", margin: "28px 0" }} />
+
+      <h2 className="protocol-heading" style={{ margin: 0, fontSize: 28 }}>
         Upstream credential
       </h2>
 
@@ -158,4 +173,15 @@ function statusBadge(status: EndpointSummary["status"]): string {
     return styles.badgePaused!;
   }
   return styles.badgeDraft!;
+}
+
+function lastTestText(endpoint: EndpointSummary): string {
+  if (endpoint.lastTestAt === null) {
+    return "No connectivity test recorded yet.";
+  }
+  const when = endpoint.lastTestAt.toISOString().split("T")[0];
+  if (endpoint.lastTestStatus === "ok") {
+    return `Last test passed (HTTP ${endpoint.lastTestHttpStatus}, ${endpoint.lastTestResponseSize} bytes, ${endpoint.lastTestLatencyMs} ms) on ${when}.`;
+  }
+  return `Last test failed (${endpoint.lastTestStatus}) on ${when}.`;
 }

@@ -103,6 +103,7 @@ describe("EndpointDetails", () => {
         credentialAction={ok}
         payoutAction={ok}
         priceAction={ok}
+        connectivityAction={ok}
       />,
     );
     expect(screen.getByText("https://agentpay.example/g/public-abc")).toBeInTheDocument();
@@ -119,6 +120,7 @@ describe("EndpointDetails", () => {
         credentialAction={ok}
         payoutAction={ok}
         priceAction={ok}
+        connectivityAction={ok}
       />,
     );
     expect(screen.getByRole("button", { name: /activate endpoint/i })).toBeInTheDocument();
@@ -138,6 +140,7 @@ describe("EndpointDetails", () => {
         credentialAction={ok}
         payoutAction={ok}
         priceAction={ok}
+        connectivityAction={ok}
       />,
     );
     expect(
@@ -156,6 +159,7 @@ describe("EndpointDetails", () => {
         credentialAction={ok}
         payoutAction={ok}
         priceAction={ok}
+        connectivityAction={ok}
       />,
     );
     expect(container.innerHTML).not.toContain("secret-token");

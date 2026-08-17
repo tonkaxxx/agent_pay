@@ -181,6 +181,7 @@
 - [ ] **Step 3: Failing action/UI tests then implement server actions and pages**
   Action tests on pglite with a fake session; component tests assert secrets never render.
 - [ ] **Step 4: GREEN + commit** `git add -A && git commit -m "feat: add endpoint configuration and dashboard CRUD"`
+  Committed as `b002c33`. File layout differs from the plan: components live under `web/src/components/dashboard/*` (not `web/src/features/gateway/dashboard/*`) to match the existing app structure; action tests are split across `service.test.ts` and a later-added `actions.test.ts` (connectivity action, committed with Task 5 wiring).
 
 ---
 
@@ -202,12 +203,13 @@
 - Produces: `runConnectivityTest(url, credential, deps): ConnectivityResult`.
 - Invariant: activation tests and paid requests share the same transport.
 
-- [ ] **Step 1: Failing URL/IP/resolve tests**
-- [ ] **Step 2: Implement url-policy, ip, resolve**
-- [ ] **Step 3: Failing transport tests then implement**
+- [x] **Step 1: Failing URL/IP/resolve tests**
+- [x] **Step 2: Implement url-policy, ip, resolve**
+- [x] **Step 3: Failing transport tests then implement**
   Local deterministic HTTP servers with an injected resolver that treats loopback as allowed only for tests: success + header allowlist; 3xx/4xx/5xx; redirect rejection; timeout; oversize body; credential sent exactly once; no `Authorization`/cookie/`Host`/payment-header forwarding; `Content-Type` preserved; `Set-Cookie`/cors stripped.
-- [ ] **Step 4: Connectivity test module + tests**
-- [ ] **Step 5: GREEN + commit** `git add -A && git commit -m "feat: add SSRF-safe bounded GET upstream transport"`
+- [x] **Step 4: Connectivity test module + tests**
+- [x] **Step 5: GREEN + commit** `git add -A && git commit -m "feat: add SSRF-safe bounded GET upstream transport"`
+  Committed as `edae955`. Deviations: the plan required a pinned Undici dispatcher and a `package.json` `undici` dependency; the implementation instead uses `node:https` `request` with a custom `lookup` callback, so no `undici` dependency was added. `package.json` was NOT modified. Failure reasons are `forbidden|dns|network|timeout|too_large|redirect|client_error|server_error|protocol`. Redirects are rejected (not retried). `captureBody: false` lets connectivity tests avoid buffering the upstream body. A follow-up commit wires `testConnectivityAction` + `ConnectivityForm` into the dashboard and adds `web/src/features/gateway/actions.test.ts` (mock `@/auth`, `@/db`, `next/cache`, `next/navigation`, `./upstream/connectivity`).
 
 ---
 

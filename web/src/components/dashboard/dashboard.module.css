@@ -136,6 +136,16 @@
   font-size: 12px;
 }
 
+.formSuccess {
+  margin-bottom: 18px;
+  padding: 11px 14px;
+  border: 1px solid rgba(36, 120, 70, 0.4);
+  border-radius: 10px;
+  background: rgba(36, 120, 70, 0.06);
+  color: #247846;
+  font-size: 12px;
+}
+
 .hint {
   color: var(--muted);
   font-size: 11px;

@@ -13,16 +13,22 @@ import {
   changeEndpointPrice,
   createEndpointDraft,
   hasRecentSignIn,
+  recordEndpointConnectivityTest,
   replaceEndpointCredential,
   ServiceError,
   setEndpointStatus,
   updateEndpointDraft,
   type ServiceAuth,
 } from "./service";
+import { getEndpointRecord } from "./repository";
+import { decryptSecret } from "./secrets";
+import { runConnectivityTest } from "./upstream/connectivity";
+import { validateUpstreamUrl } from "./upstream/url-policy";
 import type { EndpointStatus } from "./repository";
 
 export interface ActionState {
   readonly error?: string;
+  readonly success?: string;
   readonly fieldErrors?: Readonly<Record<string, string>>;
 }
 
@@ -186,4 +192,55 @@ export async function changePriceAction(
   }
   revalidatePath(`/dashboard/${endpointId}`);
   return {};
+}
+
+export async function testConnectivityAction(
+  previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const auth = await currentAuth();
+  const endpointId = readString(formData, "endpointId");
+  try {
+    const current = await getEndpointRecord(auth.db, endpointId, auth.sellerId);
+    if (current === null) {
+      return { error: "Endpoint not found" };
+    }
+    const url = validateUpstreamUrl(current.upstreamUrl);
+    const plaintext =
+      current.authMode !== "none" &&
+      current.secretCiphertext !== null &&
+      current.secretIv !== null &&
+      current.secretAuthTag !== null &&
+      current.secretKeyVersion !== null
+        ? decryptSecret(
+            {
+              keyVersion: current.secretKeyVersion,
+              iv: current.secretIv,
+              authTag: current.secretAuthTag,
+              ciphertext: current.secretCiphertext,
+            },
+            vaultKeyRing(),
+          )
+        : null;
+    const credential =
+      current.authMode !== "none" && plaintext !== null
+        ? { mode: current.authMode, value: plaintext }
+        : null;
+    const result = await runConnectivityTest({ url, credential });
+    await recordEndpointConnectivityTest(auth, endpointId, {
+      status: result.status,
+      httpStatus: result.httpStatus,
+      responseSize: result.responseSize,
+      latencyMs: result.latencyMs,
+    });
+    revalidatePath(`/dashboard/${endpointId}`);
+    return {
+      success:
+        result.ok === true
+          ? `Upstream answered HTTP ${result.httpStatus} in ${result.latencyMs} ms.`
+          : `Upstream unreachable (${result.status}) in ${result.latencyMs} ms.`,
+    };
+  } catch (error) {
+    return fieldError(error);
+  }
 }

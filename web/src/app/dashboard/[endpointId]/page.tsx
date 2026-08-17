@@ -11,6 +11,7 @@ import {
   changePriceAction,
   replaceCredentialAction,
   setStatusAction,
+  testConnectivityAction,
 } from "@/features/gateway/actions";
 import { getEndpointForOwner } from "@/features/gateway/repository";
 import { hasRecentSignIn } from "@/features/gateway/service";
@@ -60,6 +61,7 @@ export default async function EndpointDetailPage({
         credentialAction={replaceCredentialAction}
         payoutAction={changePayoutAction}
         priceAction={changePriceAction}
+        connectivityAction={testConnectivityAction}
       />
     </main>
   );
