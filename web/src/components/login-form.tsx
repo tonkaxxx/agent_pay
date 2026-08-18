@@ -21,7 +21,7 @@ export function LoginForm({ github, email }: LoginFormOptions) {
           <button
             className="login-provider-button"
             type="button"
-            onClick={() => void signIn("github")}
+            onClick={() => void signIn("github", { redirectTo: "/dashboard" })}
           >
             Continue with GitHub
           </button>
@@ -35,7 +35,7 @@ export function LoginForm({ github, email }: LoginFormOptions) {
                 setSubmitted(false);
                 return;
               }
-              await signIn("email", { email: emailValue.trim(), redirectTo: "/dashboard" });
+              await signIn("nodemailer", { email: emailValue.trim(), redirectTo: "/dashboard" });
             }}
           >
             <label htmlFor="login-email">Email</label>

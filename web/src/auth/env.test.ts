@@ -111,14 +111,14 @@ describe("loadAuthEnvironment", () => {
     const env = loadAuthEnvironment(
       baseEnv({ AUTH_GITHUB_ENTERPRISE_URL: "https://ghe.example.com" }),
     );
-    expect(env.github?.enterpriseBaseUrl).toBe("https://ghe.example.com/");
+    expect(env.github?.enterpriseBaseUrl).toBe("https://ghe.example.com");
   });
 
   it("allows a loopback HTTP GitHub Enterprise base URL outside production", () => {
     const env = loadAuthEnvironment(
       baseEnv({ AUTH_GITHUB_ENTERPRISE_URL: "http://127.0.0.1:4200" }),
     );
-    expect(env.github?.enterpriseBaseUrl).toBe("http://127.0.0.1:4200/");
+    expect(env.github?.enterpriseBaseUrl).toBe("http://127.0.0.1:4200");
   });
 
   it("rejects an insecure or malformed GitHub Enterprise base URL", () => {
@@ -213,5 +213,21 @@ describe("loadAuthEnvironment", () => {
     expect(() =>
       loadAuthEnvironment(baseEnv({ NEXT_PUBLIC_SITE_URL: undefined })),
     ).toThrow(/AUTH_URL/);
+  });
+
+  it("allows a loopback auth URL with a port for local development", () => {
+    const env = loadAuthEnvironment(
+      baseEnv({
+        NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:3100",
+        AGENTPAY_ALLOW_INSECURE_LOCAL_ORIGIN: "true",
+      }),
+    );
+    expect(env.url).toBe("http://127.0.0.1:3100/");
+  });
+
+  it("rejects ports on non-loopback auth URLs", () => {
+    expect(() =>
+      loadAuthEnvironment(baseEnv({ NEXT_PUBLIC_SITE_URL: "https://agentpay.test:8443" })),
+    ).toThrow(/NEXT_PUBLIC_SITE_URL/);
   });
 });

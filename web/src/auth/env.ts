@@ -84,7 +84,10 @@ function parseBaseUrl(value: string, name: string): string {
   if (url.username || url.password) {
     throw configurationError(name);
   }
-  if (url.pathname !== "/" || url.search || url.hash || url.port) {
+  if (url.pathname !== "/" || url.search || url.hash) {
+    throw configurationError(name);
+  }
+  if (!isLoopbackHostname(url.hostname) && url.port) {
     throw configurationError(name);
   }
   return url.href;
@@ -191,7 +194,7 @@ function parseEnterpriseBaseUrl(environment: Environment): string | undefined {
       throw configurationError(name);
     }
   }
-  return url.href;
+  return url.href.replace(/\/$/, "");
 }
 
 function parseEmailServer(value: string, name: string): string {
