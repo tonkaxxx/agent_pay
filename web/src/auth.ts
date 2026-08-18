@@ -40,6 +40,9 @@ export function buildAuthConfig(
       GitHub({
         clientId: environment.github.clientId,
         clientSecret: environment.github.clientSecret,
+        ...(environment.github.enterpriseBaseUrl !== undefined
+          ? { enterprise: { baseUrl: environment.github.enterpriseBaseUrl } }
+          : {}),
       }),
     );
   }

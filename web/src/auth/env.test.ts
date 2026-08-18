@@ -107,6 +107,60 @@ describe("loadAuthEnvironment", () => {
     ).toThrow();
   });
 
+  it("accepts an optional GitHub Enterprise base URL", () => {
+    const env = loadAuthEnvironment(
+      baseEnv({ AUTH_GITHUB_ENTERPRISE_URL: "https://ghe.example.com" }),
+    );
+    expect(env.github?.enterpriseBaseUrl).toBe("https://ghe.example.com/");
+  });
+
+  it("allows a loopback HTTP GitHub Enterprise base URL outside production", () => {
+    const env = loadAuthEnvironment(
+      baseEnv({ AUTH_GITHUB_ENTERPRISE_URL: "http://127.0.0.1:4200" }),
+    );
+    expect(env.github?.enterpriseBaseUrl).toBe("http://127.0.0.1:4200/");
+  });
+
+  it("rejects an insecure or malformed GitHub Enterprise base URL", () => {
+    expect(() =>
+      loadAuthEnvironment(
+        baseEnv({ AUTH_GITHUB_ENTERPRISE_URL: "http://ghe.example.com" }),
+      ),
+    ).toThrow(/AUTH_GITHUB_ENTERPRISE_URL/);
+    expect(() =>
+      loadAuthEnvironment(
+        baseEnv({
+          NODE_ENV: "production",
+          AUTH_GITHUB_ENTERPRISE_URL: "http://127.0.0.1:4200",
+        }),
+      ),
+    ).toThrow(/AUTH_GITHUB_ENTERPRISE_URL/);
+    expect(() =>
+      loadAuthEnvironment(
+        baseEnv({
+          AUTH_GITHUB_ENTERPRISE_URL: "https://user:pass@ghe.example.com",
+        }),
+      ),
+    ).toThrow(/AUTH_GITHUB_ENTERPRISE_URL/);
+    expect(() =>
+      loadAuthEnvironment(
+        baseEnv({ AUTH_GITHUB_ENTERPRISE_URL: "https://ghe.example.com/api/v3" }),
+      ),
+    ).toThrow(/AUTH_GITHUB_ENTERPRISE_URL/);
+  });
+
+  it("rejects a GitHub Enterprise base URL without OAuth credentials", () => {
+    expect(() =>
+      loadAuthEnvironment(
+        baseEnv({
+          AUTH_GITHUB_ID: undefined,
+          AUTH_GITHUB_SECRET: undefined,
+          AUTH_GITHUB_ENTERPRISE_URL: "https://ghe.example.com",
+        }),
+      ),
+    ).toThrow(/AUTH_GITHUB_ID/);
+  });
+
   it("rejects a half-configured provider", () => {
     expect(() =>
       loadAuthEnvironment(baseEnv({ AUTH_EMAIL_SERVER: undefined })),

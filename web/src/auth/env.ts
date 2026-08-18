@@ -7,6 +7,7 @@ export interface AuthEnvironment {
   readonly github?: {
     readonly clientId: string;
     readonly clientSecret: string;
+    readonly enterpriseBaseUrl?: string;
   };
   readonly email?: {
     readonly server: string;
@@ -158,6 +159,41 @@ function parseOAuthPair(
   return { clientId, clientSecret };
 }
 
+function parseEnterpriseBaseUrl(environment: Environment): string | undefined {
+  const raw = optional(environment, "AUTH_GITHUB_ENTERPRISE_URL");
+  if (raw === undefined) {
+    return undefined;
+  }
+  const name = "AUTH_GITHUB_ENTERPRISE_URL";
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw configurationError(name);
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw configurationError(name);
+  }
+  if (url.username || url.password) {
+    throw configurationError(name);
+  }
+  if (url.pathname !== "/" && url.pathname !== "") {
+    throw configurationError(name);
+  }
+  if (url.search || url.hash) {
+    throw configurationError(name);
+  }
+  if (url.protocol === "http:") {
+    if (environment.NODE_ENV === "production") {
+      throw configurationError(name);
+    }
+    if (!isLoopbackHostname(url.hostname)) {
+      throw configurationError(name);
+    }
+  }
+  return url.href;
+}
+
 function parseEmailServer(value: string, name: string): string {
   let url: URL;
   try {
@@ -204,11 +240,22 @@ export function loadAuthEnvironment(
     };
   }
 
-  const github = parseOAuthPair(
+  const githubBase = parseOAuthPair(
     environment,
     "AUTH_GITHUB_ID",
     "AUTH_GITHUB_SECRET",
   );
+  const enterpriseBaseUrl = parseEnterpriseBaseUrl(environment);
+  if (enterpriseBaseUrl !== undefined && githubBase === undefined) {
+    throw configurationError("AUTH_GITHUB_ID");
+  }
+  let github: AuthEnvironment["github"];
+  if (githubBase !== undefined) {
+    github = {
+      ...githubBase,
+      ...(enterpriseBaseUrl !== undefined ? { enterpriseBaseUrl } : {}),
+    };
+  }
 
   let email: AuthEnvironment["email"];
   const emailServer = optional(environment, "AUTH_EMAIL_SERVER");
