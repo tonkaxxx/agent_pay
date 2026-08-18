@@ -2,6 +2,8 @@ import { encodePaymentRequiredHeader } from "@x402/core/http";
 import { describe, expect, test } from "vitest";
 
 import {
+  assertEncryptionConfiguration,
+  requireNonPlaceholderSecret,
   validateImageReference,
   validateUnpaidContract,
 } from "./verify-production.mjs";
@@ -76,5 +78,44 @@ describe("production verifier policy", () => {
       baseUrl,
       payTo,
     })).toThrow("unpaid_contract_invalid");
+  });
+
+  test.each([
+    "INVALID_CHANGE_ME_USE_A_32_BYTE_BASE64_KEY",
+    "replace_me_with_a_real_secret",
+    "changeme-please",
+  ])("rejects placeholder secret %s", value => {
+    expect(() => requireNonPlaceholderSecret(value))
+      .toThrow("placeholder_secret");
+  });
+
+  test("accepts a real master key and rejects missing encryption configuration", () => {
+    const masterKey = Buffer.alloc(32, 7).toString("base64");
+    expect(requireNonPlaceholderSecret(masterKey)).toBe(masterKey);
+    expect(() => assertEncryptionConfiguration({
+      services: {
+        web: {
+          environment: {
+            AUTH_SECRET: "a",
+            AGENTPAY_MASTER_KEY: "INVALID_CHANGE_ME_USE_A_32_BYTE_BASE64_KEY",
+            AUTH_GITHUB_SECRET: "b",
+          },
+        },
+      },
+    })).toThrow("placeholder_secret");
+    expect(() => assertEncryptionConfiguration({
+      services: {
+        web: {
+          environment: {
+            AUTH_SECRET: "a",
+            AGENTPAY_MASTER_KEY: "AQID",
+            AUTH_GITHUB_SECRET: "b",
+          },
+        },
+      },
+    })).toThrow("missing_encryption_config");
+    expect(() => assertEncryptionConfiguration({ services: {} })).toThrow(
+      "placeholder_secret",
+    );
   });
 });

@@ -27,10 +27,19 @@ services:
       AGENTPAY_PAY_TO: ${AGENTPAY_PAY_TO:?set the USDC recipient}
       FACILITATOR_URL: http://facilitator:4022
       REDIS_URL: redis://:${REDIS_PASSWORD:?set a URL-safe Redis password}@redis:6379/0
+      DATABASE_URL: postgres://${POSTGRES_USER:?set the PostgreSQL user}:${POSTGRES_PASSWORD:?set the PostgreSQL password}@postgres:5432/${POSTGRES_DB:?set the PostgreSQL database}
+      AUTH_SECRET: ${AUTH_SECRET:?set the Auth.js secret}
+      AUTH_GITHUB_ID: ${AUTH_GITHUB_ID:?set the GitHub OAuth client id}
+      AUTH_GITHUB_SECRET: ${AUTH_GITHUB_SECRET:?set the GitHub OAuth client secret}
+      AUTH_EMAIL_SERVER: ${AUTH_EMAIL_SERVER:?set the SMTP URL}
+      AUTH_EMAIL_FROM: ${AUTH_EMAIL_FROM:?set the email from address}
+      AGENTPAY_MASTER_KEY: ${AGENTPAY_MASTER_KEY:?set the encryption master key}
     depends_on:
       facilitator:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     networks: [backend, web-net]
     tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
@@ -98,6 +107,49 @@ services:
     volumes:
       - agentpay-redis-data:/data
 
+  postgres:
+    <<: *app-hardening
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    user: "70:70"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set the PostgreSQL user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set the PostgreSQL password}
+      POSTGRES_DB: ${POSTGRES_DB:?set the PostgreSQL database}
+    networks: [backend]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+      - /run/postgresql:rw,noexec,nosuid,size=4m
+    pids_limit: 256
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - agentpay-postgres-data:/var/lib/postgresql/data
+
+  migrate:
+    <<: *app-hardening
+    image: ${AGENTPAY_IMAGE:?set an immutable AgentPay image tag}
+    user: "1000:1000"
+    command: ["node", "/app/web/scripts/migrate.mjs"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:?set the PostgreSQL user}:${POSTGRES_PASSWORD:?set the PostgreSQL password}@postgres:5432/${POSTGRES_DB:?set the PostgreSQL database}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+    restart: "no"
+    stop_grace_period: 5s
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    pids_limit: 128
+    mem_limit: 256m
+    cpus: 0.5
+
 networks:
   backend:
     name: agentpay-backend
@@ -111,3 +163,5 @@ networks:
 volumes:
   agentpay-redis-data:
     name: agentpay-redis-data
+  agentpay-postgres-data:
+    name: agentpay-postgres-data

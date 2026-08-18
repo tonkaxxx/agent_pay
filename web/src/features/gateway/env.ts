@@ -35,6 +35,9 @@ function parseMasterKeyBase64(value: string, name: string): string {
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value)) {
     throw configurationError(name);
   }
+  if (/change_me|changeme|invalid_change_me|replace_me/i.test(value)) {
+    throw configurationError(name);
+  }
   const decoded = Buffer.from(value, "base64");
   if (decoded.byteLength !== 32) {
     throw configurationError(name);

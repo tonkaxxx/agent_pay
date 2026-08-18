@@ -16,4 +16,8 @@ export interface VerifiedUnpaidContract {
 
 export function validateImageReference(image: string): string;
 export function validateUnpaidContract(input: UnpaidContractInput): VerifiedUnpaidContract;
+export function requireNonPlaceholderSecret(value: string): string;
+export function assertEncryptionConfiguration(rendered: {
+  services?: { web?: { environment?: Record<string, string | undefined> } };
+}): void;
 export function verifyProduction(args: readonly string[]): Promise<void>;

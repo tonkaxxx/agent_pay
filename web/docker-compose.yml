@@ -17,12 +17,15 @@ services:
       AGENTPAY_PAY_TO: 0x58B0fF9Fd53C854f3779acdE649a7FAc2de2d1CB
       FACILITATOR_URL: http://facilitator:4022
       REDIS_URL: redis://:local-agentpay-only@redis:6379/0
+      DATABASE_URL: postgres://agentpay:local-agentpay-only@postgres:5432/agentpay
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
       facilitator:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     networks: [backend, public]
     cap_drop: [ALL]
@@ -88,6 +91,45 @@ services:
     volumes:
       - agentpay-redis-local:/data
 
+  postgres:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    user: "70:70"
+    environment:
+      POSTGRES_USER: agentpay
+      POSTGRES_PASSWORD: local-agentpay-only
+      POSTGRES_DB: agentpay
+    networks: [backend]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+      - /run/postgresql:rw,noexec,nosuid,size=4m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentpay -d agentpay"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - agentpay-postgres-local:/var/lib/postgresql/data
+
+  migrate:
+    image: agentpay:local
+    command: ["node", "/app/web/scripts/migrate.mjs"]
+    environment:
+      DATABASE_URL: postgres://agentpay:local-agentpay-only@postgres:5432/agentpay
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    restart: "no"
+
 networks:
   backend:
     internal: true
@@ -96,3 +138,4 @@ networks:
 
 volumes:
   agentpay-redis-local:
+  agentpay-postgres-local:

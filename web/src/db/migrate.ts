@@ -30,12 +30,16 @@ export async function applyMigrations<TDb>(
   await run(db, migrationSettings);
 }
 
-export async function runMigrations(databaseUrl: string): Promise<void> {
+export async function runMigrations(
+  databaseUrl: string,
+  overrides: Partial<MigrationSettings> = {},
+): Promise<void> {
   const { createDbClient } = await import("@/db/client");
   const { migrate } = await import("drizzle-orm/node-postgres/migrator");
   const handle = createDbClient(databaseUrl);
+  const settings: MigrationSettings = { ...migrationSettings, ...overrides };
   try {
-    await applyMigrations(handle.db, migrate);
+    await migrate(handle.db, settings);
   } finally {
     await handle.close();
   }

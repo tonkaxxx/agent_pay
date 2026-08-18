@@ -11,6 +11,8 @@ import { decodePaymentRequiredHeader } from "@x402/core/http";
 const BASE_NETWORK = "eip155:8453";
 const BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const PRIVATE_KEY_PATTERN = /0x[0-9a-fA-F]{64}/;
+const PLACEHOLDER_SECRET_PATTERN =
+  /change_me|changeme|invalid_change_me|replace_me/i;
 const IMMUTABLE_TAG_PATTERN = /:[0-9a-f]{40}$/;
 const IMMUTABLE_DIGEST_PATTERN = /@sha256:[0-9a-f]{64}$/;
 const directory = dirname(fileURLToPath(import.meta.url));
@@ -162,6 +164,25 @@ function containerId(options, service) {
   return id;
 }
 
+export function requireNonPlaceholderSecret(value) {
+  if (typeof value !== "string" || value.trim() === "" ||
+    PLACEHOLDER_SECRET_PATTERN.test(value)) {
+    fail("placeholder_secret");
+  }
+  return value;
+}
+
+export function assertEncryptionConfiguration(rendered) {
+  const webEnvironment = rendered.services?.web?.environment ?? {};
+  requireNonPlaceholderSecret(webEnvironment.AUTH_SECRET);
+  requireNonPlaceholderSecret(webEnvironment.AGENTPAY_MASTER_KEY);
+  requireNonPlaceholderSecret(webEnvironment.AUTH_GITHUB_SECRET);
+  if (typeof webEnvironment.AGENTPAY_MASTER_KEY !== "string" ||
+    webEnvironment.AGENTPAY_MASTER_KEY.length < 16) {
+    fail("missing_encryption_config");
+  }
+}
+
 function inspectContainer(id) {
   const values = JSON.parse(execFileSync("docker", ["inspect", id], {
     encoding: "utf8",
@@ -186,7 +207,8 @@ async function healthyContainer(options, service) {
 function assertContainerPolicy(service, inspection) {
   const published = Object.values(inspection.NetworkSettings?.Ports ?? {})
     .flatMap(value => value ?? []);
-  if ((service === "facilitator" || service === "redis") && published.length !== 0) {
+  if ((service === "facilitator" || service === "redis" || service === "postgres") &&
+    published.length !== 0) {
     fail("internal_port_published");
   }
   const networks = Object.keys(inspection.NetworkSettings?.Networks ?? {}).sort();
@@ -250,8 +272,12 @@ export async function verifyProduction(args) {
   if (!webImage || !facilitatorImage) fail("image_mismatch");
   if (webImage !== facilitatorImage) fail("image_mismatch");
 
+  if (!options.local) {
+    assertEncryptionConfiguration(rendered);
+  }
+
   const inspections = {};
-  for (const service of ["web", "facilitator", "redis"]) {
+  for (const service of ["web", "facilitator", "redis", "postgres"]) {
     inspections[service] = await healthyContainer(options, service);
     assertContainerPolicy(service, inspections[service]);
   }

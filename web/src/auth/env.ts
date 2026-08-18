@@ -152,8 +152,8 @@ function parseOAuthPair(
   if (clientId === undefined || clientSecret === undefined) {
     throw configurationError(idName);
   }
-  if (PLACEHOLDER_SECRET.test(clientSecret)) {
-    throw configurationError(secretName);
+  if (PLACEHOLDER_SECRET.test(clientId) || PLACEHOLDER_SECRET.test(clientSecret)) {
+    throw configurationError(idName);
   }
   return { clientId, clientSecret };
 }
@@ -171,11 +171,17 @@ function parseEmailServer(value: string, name: string): string {
   if (url.port === "") {
     throw configurationError(name);
   }
+  if (PLACEHOLDER_SECRET.test(value)) {
+    throw configurationError(name);
+  }
   return value;
 }
 
 function parseEmailFrom(value: string, name: string): string {
   if (!isEmail(value)) {
+    throw configurationError(name);
+  }
+  if (PLACEHOLDER_SECRET.test(value)) {
     throw configurationError(name);
   }
   return value;
