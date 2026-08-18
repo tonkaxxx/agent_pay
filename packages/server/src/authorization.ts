@@ -35,6 +35,11 @@ export class InvalidAuthorizationError extends Error {
   }
 }
 
+export interface AuthorizationDetails {
+  readonly fingerprint: string;
+  readonly payer: Address;
+}
+
 function fail(): never {
   throw new InvalidAuthorizationError();
 }
@@ -57,10 +62,10 @@ function sameAddress(left: unknown, right: Address): boolean {
   return address(left) === getAddress(right);
 }
 
-export function authorizationFingerprint(
+export function authorizationDetails(
   encodedHeader: string,
   policy: AuthorizationPolicy,
-): string {
+): AuthorizationDetails {
   try {
     const payment = decodePaymentSignatureHeader(encodedHeader);
     if (payment.x402Version !== 2) fail();
@@ -90,9 +95,19 @@ export function authorizationFingerprint(
       payer.toLowerCase(),
       nonce.toLowerCase(),
     ].join(":");
-    return createHash("sha256").update(material).digest("hex");
+    return {
+      fingerprint: createHash("sha256").update(material).digest("hex"),
+      payer,
+    };
   } catch (error) {
     if (error instanceof InvalidAuthorizationError) throw error;
     throw new InvalidAuthorizationError();
   }
+}
+
+export function authorizationFingerprint(
+  encodedHeader: string,
+  policy: AuthorizationPolicy,
+): string {
+  return authorizationDetails(encodedHeader, policy).fingerprint;
 }

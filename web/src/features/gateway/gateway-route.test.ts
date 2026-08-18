@@ -50,6 +50,7 @@ function dependencies(overrides: Partial<GatewayRouteDependencies> = {}): Gatewa
     createPaidHandler: vi.fn(() => async () =>
       Response.json({ data: "paid" }, { status: 200, headers: { "Content-Type": "application/json" } }),
     ),
+    recordPaymentEvent: vi.fn(async () => undefined),
     protect: (handler) => handler as never,
     guard: (handler) => handler,
     ...overrides,
@@ -68,6 +69,19 @@ describe("createGatewayRoute", () => {
     await expect(response.json()).resolves.toEqual({ data: "paid" });
     expect(deps.loadEndpoint).toHaveBeenCalledWith(endpoint.publicId);
     expect(deps.createPaidHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not suppress an already-produced response when event persistence fails", async () => {
+    const recordPaymentEvent = vi.fn(async () => {
+      throw new Error("database unavailable");
+    });
+    const route = createGatewayRoute(dependencies({ recordPaymentEvent }), logger);
+
+    const response = await route(request() as never, endpoint.publicId);
+
+    expect(response.status).toBe(200);
+    expect(recordPaymentEvent).toHaveBeenCalledOnce();
+    await expect(response.json()).resolves.toEqual({ data: "paid" });
   });
 
   it("returns 404 when the endpoint is unknown", async () => {

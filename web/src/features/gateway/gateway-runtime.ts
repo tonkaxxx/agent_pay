@@ -10,6 +10,8 @@ import type { NextRequest } from "next/server";
 import { getDatabase } from "@/db";
 import { loadMasterKeyConfig } from "@/features/gateway/env";
 import { decryptSecret } from "@/features/gateway/secrets";
+import { recordSettlement } from "@/features/gateway/events";
+import { buildPaymentEvent } from "@/features/gateway/payment-event";
 import { validateUpstreamUrl } from "@/features/gateway/upstream/url-policy";
 import type { UpstreamCredential } from "@/features/gateway/upstream/transport";
 import {
@@ -51,14 +53,18 @@ export function buildGatewayRuntime(
         ),
       buildPolicy: buildGatewayPolicy,
       siteUrl: () => config.siteUrl,
-      createPaidHandler: (endpoint, request) => {
+      createPaidHandler: (endpoint, request, observe) => {
         const accept = request.headers.get("accept");
         return createGatewayPaidHandler({
           url: validateUpstreamUrl(endpoint.upstreamUrl),
           credential: () => decryptEndpointCredential(endpoint, vault.ring),
           query: request.nextUrl.search.replace(/^\?/, ""),
+          observe,
           ...(accept !== null ? { accept } : {}),
         });
+      },
+      recordPaymentEvent: async context => {
+        await recordSettlement(db.db, await buildPaymentEvent(context));
       },
       protect: withX402,
       guard: (handler, options) =>

@@ -59,6 +59,15 @@ async function createDraft(owner = OWNER_A, publicId = "endpoint-1"): Promise<En
   return createEndpoint(tdb.db, owner, spec(), publicId);
 }
 
+async function markConnectivityOk(endpointId: string, owner = OWNER_A): Promise<void> {
+  await recordConnectivityTest(tdb.db, endpointId, owner, {
+    status: "ok",
+    httpStatus: 200,
+    responseSize: 128,
+    latencyMs: 20,
+  });
+}
+
 const secret: EncryptedSecret = {
   keyVersion: 1,
   iv: "iv",
@@ -128,6 +137,7 @@ describe("findActiveByPublicId", () => {
     expect(await findActiveByPublicId(tdb.db, "endpoint-1")).toBeNull();
     expect(await findActiveByPublicId(tdb.db, "unknown")).toBeNull();
     await updateEndpointSecret(tdb.db, endpoint.id, OWNER_A, secret);
+    await markConnectivityOk(endpoint.id);
     await transitionEndpointStatus(tdb.db, endpoint.id, OWNER_A, "active");
     await transitionEndpointStatus(tdb.db, endpoint.id, OWNER_A, "paused");
     expect(await findActiveByPublicId(tdb.db, "endpoint-1")).toBeNull();
@@ -136,6 +146,7 @@ describe("findActiveByPublicId", () => {
   it("returns the record for an active endpoint", async () => {
     const endpoint = await createDraft(OWNER_A, "endpoint-1");
     await updateEndpointSecret(tdb.db, endpoint.id, OWNER_A, secret);
+    await markConnectivityOk(endpoint.id);
     await transitionEndpointStatus(tdb.db, endpoint.id, OWNER_A, "active");
     const found = await findActiveByPublicId(tdb.db, "endpoint-1");
     expect(found).not.toBeNull();
@@ -144,6 +155,25 @@ describe("findActiveByPublicId", () => {
 });
 
 describe("transitionEndpointStatus", () => {
+  it("rejects activation until the current upstream configuration passed connectivity", async () => {
+    const endpoint = await createDraft(OWNER_A, "endpoint-connectivity");
+    await updateEndpointSecret(tdb.db, endpoint.id, OWNER_A, secret);
+
+    await expect(
+      transitionEndpointStatus(tdb.db, endpoint.id, OWNER_A, "active"),
+    ).rejects.toThrow(InvalidTransitionError);
+
+    await recordConnectivityTest(tdb.db, endpoint.id, OWNER_A, {
+      status: "server_error",
+      httpStatus: 503,
+      responseSize: 0,
+      latencyMs: 25,
+    });
+    await expect(
+      transitionEndpointStatus(tdb.db, endpoint.id, OWNER_A, "active"),
+    ).rejects.toThrow(InvalidTransitionError);
+  });
+
   it("rejects activation without a configured secret", async () => {
     const endpoint = await createDraft(OWNER_A, "endpoint-1");
     await expect(
@@ -161,6 +191,7 @@ describe("transitionEndpointStatus", () => {
   it("moves a draft to active and back to paused", async () => {
     const endpoint = await createDraft(OWNER_A, "endpoint-1");
     await updateEndpointSecret(tdb.db, endpoint.id, OWNER_A, secret);
+    await markConnectivityOk(endpoint.id);
 
     const active = await transitionEndpointStatus(tdb.db, endpoint.id, OWNER_A, "active");
     expect(active!.status).toBe("active");
@@ -179,6 +210,7 @@ describe("transitionEndpointStatus", () => {
     ).rejects.toThrow(InvalidTransitionError);
 
     await updateEndpointSecret(tdb.db, endpoint.id, OWNER_A, secret);
+    await markConnectivityOk(endpoint.id);
     await transitionEndpointStatus(tdb.db, endpoint.id, OWNER_A, "active");
     await expect(
       transitionEndpointStatus(tdb.db, endpoint.id, OWNER_A, "draft"),
@@ -188,6 +220,7 @@ describe("transitionEndpointStatus", () => {
   it("returns null for another owner and writes an audit event on success", async () => {
     const endpoint = await createDraft(OWNER_A, "endpoint-1");
     await updateEndpointSecret(tdb.db, endpoint.id, OWNER_A, secret);
+    await markConnectivityOk(endpoint.id);
     expect(await transitionEndpointStatus(tdb.db, endpoint.id, OWNER_B, "active")).toBeNull();
 
     await transitionEndpointStatus(tdb.db, endpoint.id, OWNER_A, "active");
@@ -224,6 +257,7 @@ describe("updateEndpointDetails", () => {
   it("rejects editing an active endpoint and removing auth mode", async () => {
     const endpoint = await createDraft(OWNER_A, "endpoint-1");
     await updateEndpointSecret(tdb.db, endpoint.id, OWNER_A, secret);
+    await markConnectivityOk(endpoint.id);
     await transitionEndpointStatus(tdb.db, endpoint.id, OWNER_A, "active");
 
     await expect(

@@ -67,6 +67,36 @@ describe("upstreamUnavailableResponse", () => {
 });
 
 describe("createGatewayPaidHandler", () => {
+  it("reports the bounded upstream result for payment observability", async () => {
+    const { rt, connect } = runtime();
+    vi.mocked(connect).mockResolvedValue({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: (async function* body() {
+        yield new TextEncoder().encode("{}");
+      })(),
+      abort: () => {},
+    });
+    const observe = vi.fn();
+    const handler = createGatewayPaidHandler(
+      {
+        url: new URL("https://upstream.example/data"),
+        credential: () => null,
+        query: "",
+        observe,
+      },
+      { runtime: rt },
+    );
+
+    await handler(new Request("https://gateway.example/g/x"));
+
+    expect(observe).toHaveBeenCalledWith(expect.objectContaining({
+      ok: true,
+      status: 200,
+      contentLength: 2,
+    }));
+  });
+
   it("fetches the upstream and forwards the success body", async () => {
     const { rt, connect } = runtime();
     const encoder = new TextEncoder();

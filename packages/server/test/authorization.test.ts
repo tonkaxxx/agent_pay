@@ -6,6 +6,7 @@ import {
   BASE_NETWORK,
   BASE_USDC,
   InvalidAuthorizationError,
+  authorizationDetails,
   authorizationFingerprint,
   authorizationPolicyFromPolicy,
   createPaymentPolicy,
@@ -105,6 +106,15 @@ test("derives the same safe fingerprint from equivalent header encodings", () =>
   expect(second).toBe(first);
   expect(first).not.toContain(PAYER.slice(2).toLowerCase());
   expect(first).not.toContain(NONCE.slice(2));
+});
+
+test("returns the validated payer together with the safe fingerprint", () => {
+  const details = authorizationDetails(encodePaymentSignatureHeader(payload()), policy);
+
+  expect(details).toEqual({
+    fingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
+    payer: PAYER,
+  });
 });
 
 test.each([

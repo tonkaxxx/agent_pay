@@ -7,6 +7,7 @@ import {
   fetchUpstream,
   type UpstreamCredential,
   type UpstreamRuntime,
+  type UpstreamResult,
   type UpstreamSuccess,
 } from "./upstream/transport";
 import { resolvePinned } from "./upstream/resolve";
@@ -16,6 +17,7 @@ export interface GatewayUpstreamConfig {
   readonly credential: () => UpstreamCredential | null;
   readonly query: string;
   readonly accept?: string;
+  readonly observe?: (result: UpstreamResult) => void;
 }
 
 export interface GatewayHandlerDependencies {
@@ -83,6 +85,7 @@ export function createGatewayPaidHandler(
       timeoutMs,
       maxBytes,
     );
+    config.observe?.(result);
 
     if (!result.ok) {
       return upstreamUnavailableResponse();

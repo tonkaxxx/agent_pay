@@ -13,6 +13,8 @@ import type {
 } from "@/features/shared/payment-infrastructure";
 
 import type { EndpointRecord } from "./repository";
+import type { PaymentEventContext } from "./payment-event";
+import type { UpstreamResult } from "./upstream/transport";
 
 const privateNoStore = { "Cache-Control": "private, no-store" } as const;
 
@@ -25,7 +27,12 @@ export interface GatewayRouteDependencies {
   loadEndpoint(publicId: string): Promise<EndpointRecord | null>;
   buildPolicy(endpoint: EndpointRecord, siteUrl: string): PaymentPolicy;
   siteUrl(): string;
-  createPaidHandler(endpoint: EndpointRecord, request: NextRequest): PaymentRequestHandler;
+  createPaidHandler(
+    endpoint: EndpointRecord,
+    request: NextRequest,
+    observe: (result: UpstreamResult) => void,
+  ): PaymentRequestHandler;
+  recordPaymentEvent(context: PaymentEventContext): Promise<void>;
   protect(
     handler: PaymentRequestHandler,
     route: ReturnType<typeof createResourceRoute>,
@@ -144,8 +151,11 @@ export function createGatewayRoute(
     const route = createResourceRoute(policy);
 
     let paid: PaymentRequestHandler;
+    let upstream: UpstreamResult | null = null;
     try {
-      paid = dependencies.createPaidHandler(endpoint, request);
+      paid = dependencies.createPaidHandler(endpoint, request, result => {
+        upstream = result;
+      });
     } catch {
       return error(requestId, logger.log, publicId, {
         stage: "configuration",
@@ -180,6 +190,19 @@ export function createGatewayRoute(
         status: 503,
         reason: "payment_infrastructure_unavailable",
       });
+    }
+
+    try {
+      await dependencies.recordPaymentEvent({
+        endpointId: endpoint.id,
+        requestId,
+        paymentHeader: request.headers.get("PAYMENT-SIGNATURE"),
+        response,
+        policy,
+        upstream,
+      });
+    } catch {
+      // Payment delivery must never depend on observability persistence.
     }
 
     if (await hasSettlementFailure(response)) {

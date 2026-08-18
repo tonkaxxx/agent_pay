@@ -278,6 +278,9 @@ export async function transitionEndpointStatus(
     if (to === "active" && current.authMode !== "none" && current.secretCiphertext === null) {
       throw new InvalidTransitionError(from, to);
     }
+    if (to === "active" && current.lastTestStatus !== "ok") {
+      throw new InvalidTransitionError(from, to);
+    }
 
     const updated = await tx
       .update(schema.merchantEndpoints)
@@ -348,6 +351,18 @@ export async function updateEndpointDetails(
         ...(changes.authMode !== undefined ? { authMode: changes.authMode } : {}),
         ...(changes.payTo !== undefined ? { payTo: changes.payTo } : {}),
         ...(changes.amountAtomic !== undefined ? { amountAtomic: changes.amountAtomic } : {}),
+        ...(
+          changes.upstreamUrl !== undefined || changes.authMode !== undefined
+            ? {
+                configVersion: (current.configVersion as number) + 1,
+                lastTestStatus: null,
+                lastTestHttpStatus: null,
+                lastTestResponseSize: null,
+                lastTestLatencyMs: null,
+                lastTestAt: null,
+              }
+            : {}
+        ),
         updatedAt: new Date(),
       })
       .where(eq(schema.merchantEndpoints.id, endpointId))
@@ -379,7 +394,10 @@ export async function updateEndpointSecret(
 ): Promise<boolean> {
   return db.transaction(async (tx) => {
     const rows = await tx
-      .select({ id: schema.merchantEndpoints.id })
+      .select({
+        id: schema.merchantEndpoints.id,
+        configVersion: schema.merchantEndpoints.configVersion,
+      })
       .from(schema.merchantEndpoints)
       .where(
         and(
@@ -399,6 +417,12 @@ export async function updateEndpointSecret(
         secretIv: secret.iv,
         secretAuthTag: secret.authTag,
         secretKeyVersion: secret.keyVersion,
+        configVersion: (current.configVersion as number) + 1,
+        lastTestStatus: null,
+        lastTestHttpStatus: null,
+        lastTestResponseSize: null,
+        lastTestLatencyMs: null,
+        lastTestAt: null,
         updatedAt: new Date(),
       })
       .where(eq(schema.merchantEndpoints.id, endpointId));

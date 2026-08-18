@@ -3,16 +3,20 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 import * as schema from "@/db/schema";
 import { createTestDatabase, resetTestDatabase, type TestDatabase } from "@/db/test-db";
-import { testConnectivityAction } from "./actions";
+import { changePayoutAction, createEndpointAction, testConnectivityAction } from "./actions";
 import { newPublicId } from "./endpoint";
 import { createKeyRing } from "./secrets";
 import { createEndpointDraft, type ServiceAuth } from "./service";
 import { runConnectivityTest } from "./upstream/connectivity";
+import { sendPayoutChangeNotification } from "./notifications";
 
 vi.mock("@/auth", () => ({
   auth: vi.fn(() =>
     Promise.resolve({ user: { id: OWNER, email: "seller@example.test" } }),
   ),
+  authEnvironment: {
+    email: { server: "smtp://mail.example.test:587", from: "AgentPay <agentpay@example.test>" },
+  },
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -34,8 +38,12 @@ vi.mock("@/db", () => ({
 vi.mock("./upstream/connectivity", () => ({
   runConnectivityTest: vi.fn(),
 }));
+vi.mock("./notifications", () => ({
+  sendPayoutChangeNotification: vi.fn(async () => undefined),
+}));
 
 const mockRunConnectivityTest = vi.mocked(runConnectivityTest);
+const mockSendPayoutChangeNotification = vi.mocked(sendPayoutChangeNotification);
 
 const OWNER = "00000000-0000-0000-0000-00000000000a";
 const OTHER = "00000000-0000-0000-0000-00000000000b";
@@ -178,5 +186,40 @@ describe("testConnectivityAction", () => {
 
     expect(state).toEqual({ error: "Endpoint not found" });
     expect(mockRunConnectivityTest).not.toHaveBeenCalled();
+  });
+});
+
+describe("createEndpointAction", () => {
+  it("lets the framework redirect escape after the draft is created", async () => {
+    const data = new FormData();
+    for (const [key, value] of Object.entries({
+      ...draft,
+      credential: "top-secret",
+    })) data.set(key, value);
+
+    await expect(createEndpointAction({}, data)).rejects.toThrow(/^redirect:\/dashboard\//);
+  });
+});
+
+describe("changePayoutAction", () => {
+  it("emails the verified seller after changing the payout address", async () => {
+    const endpointId = await seededEndpoint();
+    const data = form(endpointId);
+    data.set("payTo", "0x2222222222222222222222222222222222222222");
+
+    const state = await changePayoutAction({}, data);
+
+    expect(state).toEqual({});
+    expect(mockSendPayoutChangeNotification).toHaveBeenCalledWith(
+      {
+        recipient: "seller@example.test",
+        endpointName: "Weather",
+        payTo: "0x2222222222222222222222222222222222222222",
+      },
+      {
+        server: "smtp://mail.example.test:587",
+        from: "AgentPay <agentpay@example.test>",
+      },
+    );
   });
 });

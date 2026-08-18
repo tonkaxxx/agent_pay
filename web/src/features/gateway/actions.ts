@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@/auth";
+import { auth, authEnvironment } from "@/auth";
 import { getDatabase } from "@/db";
 import { requireSeller } from "@/lib/dal";
 import { revalidatePath } from "next/cache";
@@ -22,6 +22,7 @@ import {
 } from "./service";
 import { getEndpointRecord } from "./repository";
 import { decryptSecret } from "./secrets";
+import { sendPayoutChangeNotification } from "./notifications";
 import { runConnectivityTest } from "./upstream/connectivity";
 import { validateUpstreamUrl } from "./upstream/url-policy";
 import type { EndpointStatus } from "./repository";
@@ -32,11 +33,13 @@ export interface ActionState {
   readonly fieldErrors?: Readonly<Record<string, string>>;
 }
 
-async function currentAuth(): Promise<ServiceAuth> {
+type CurrentAuth = ServiceAuth & { readonly sellerEmail: string | null };
+
+async function currentAuth(): Promise<CurrentAuth> {
   const session = await auth();
   const db = getDatabase();
   const seller = await requireSeller(db.db, session);
-  return { sellerId: seller.id, db: db.db };
+  return { sellerId: seller.id, sellerEmail: seller.email, db: db.db };
 }
 
 function vaultKeyRing() {
@@ -68,6 +71,7 @@ export async function createEndpointAction(
 ): Promise<ActionState> {
   const auth = await currentAuth();
   const credential = readString(formData, "credential");
+  let endpointId: string;
   try {
     const summary = await createEndpointDraft(
       auth,
@@ -82,10 +86,11 @@ export async function createEndpointAction(
       newPublicId(),
       vaultKeyRing(),
     );
-    redirect(`/dashboard/${summary.id}`);
+    endpointId = summary.id;
   } catch (error) {
     return fieldError(error);
   }
+  redirect(`/dashboard/${endpointId}`);
 }
 
 export async function updateEndpointAction(
@@ -168,8 +173,19 @@ export async function changePayoutAction(
   const endpointId = readString(formData, "endpointId");
   const payTo = readString(formData, "payTo");
   try {
+    if (auth.sellerEmail === null || authEnvironment.email === undefined) {
+      return { error: "Verified email is required before changing the payout address" };
+    }
     const recentAuth = await hasRecentSignIn(auth);
-    await changeEndpointPayout(auth, endpointId, payTo, recentAuth);
+    const endpoint = await changeEndpointPayout(auth, endpointId, payTo, recentAuth);
+    await sendPayoutChangeNotification(
+      {
+        recipient: auth.sellerEmail,
+        endpointName: endpoint.displayName,
+        payTo: endpoint.payTo,
+      },
+      authEnvironment.email,
+    );
   } catch (error) {
     return fieldError(error);
   }

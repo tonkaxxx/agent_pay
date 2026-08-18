@@ -18,10 +18,11 @@ export type {
 } from "./payment-policy.js";
 export {
   InvalidAuthorizationError,
+  authorizationDetails,
   authorizationFingerprint,
   authorizationPolicyFromPolicy,
 } from "./authorization.js";
-export type { AuthorizationPolicy } from "./authorization.js";
+export type { AuthorizationDetails, AuthorizationPolicy } from "./authorization.js";
 export {
   AuthorizationStoreUnavailableError,
   RedisAuthorizationStore,

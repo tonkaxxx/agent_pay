@@ -170,6 +170,12 @@ describe("setEndpointStatus", () => {
     await expect(setEndpointStatus(auth, withoutSecret.id, "active")).rejects.toThrow();
 
     const withSecret = await createEndpointDraft(auth, { ...draftInput, credential: "s" }, "public-2", vault);
+    await recordEndpointConnectivityTest(auth, withSecret.id, {
+      status: "ok",
+      httpStatus: 200,
+      responseSize: 1,
+      latencyMs: 1,
+    });
     const active = await setEndpointStatus(auth, withSecret.id, "active");
     expect(active.status).toBe("active");
 
@@ -211,6 +217,12 @@ describe("changeEndpointPayout / changeEndpointPrice", () => {
 
   it("requires recent auth to change payout on an active endpoint", async () => {
     const summary = await createEndpointDraft(auth, { ...draftInput, credential: "s" }, "public-1", vault);
+    await recordEndpointConnectivityTest(auth, summary.id, {
+      status: "ok",
+      httpStatus: 200,
+      responseSize: 1,
+      latencyMs: 1,
+    });
     await setEndpointStatus(auth, summary.id, "active");
 
     await expect(changeEndpointPayout(auth, summary.id, PAY_TO, false)).rejects.toThrow(ServiceError);
