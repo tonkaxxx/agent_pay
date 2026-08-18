@@ -27,6 +27,17 @@ The buyer needs official Base USDC, but no Base ETH and no buyer RPC URL. The
 facilitator pays transaction gas. A transaction hash by itself is public
 information and never grants access.
 
+## Hosted GET gateway for sellers
+
+Sellers sign in with GitHub or a passwordless email link, enter one fixed HTTPS
+GET upstream, choose Bearer or `X-API-Key`, set a USDC price and Base payout
+address, test connectivity, and publish `GET /g/<public-id>`. AgentPay handles
+x402 v2, replay protection, SSRF-safe proxying, encrypted credentials,
+settlement metrics, and a 5% commission ledger. The seller still receives 100%
+onchain; automatic commission collection is not part of this release.
+
+See [the hosted gateway runbook](docs/operations/hosted-get-gateway-runbook.md).
+
 ## Prompt-only agent access
 
 Give a capable autonomous agent this prompt, replacing only the placeholder:
@@ -83,8 +94,9 @@ they construct a signer. They do not read an RPC URL.
 - `docs/superpowers/specs`: approved security and architecture design.
 - `docs/superpowers/plans`: implementation and verification plan.
 
-Production runs `web`, `facilitator`, and authenticated persistent Redis on one
-server and one Docker Compose network. Only `web` is attached to public ingress.
+Production runs `web`, `facilitator`, authenticated persistent Redis,
+PostgreSQL, and a one-shot migration job on one server and one Docker Compose
+project. Only `web` is attached to public ingress.
 
 ## Local development
 

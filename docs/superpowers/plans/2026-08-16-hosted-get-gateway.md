@@ -88,19 +88,19 @@
 - Produces: `runMigrations(databaseUrl: string): Promise<void>` (used by the one-shot deploy step, never at web replica startup).
 - Invariant: atomic amounts and public IDs are `text`; safe partial unique indexes on `payment_events.fingerprint` and `payment_events.txHash`.
 
-- [ ] **Step 1: Add database dependencies**
+- [x] **Step 1: Add database dependencies**
   Add to `web/package.json`: `drizzle-orm@0.45.2`, `pg@8.23.0`; dev: `drizzle-kit@0.31.10`, `@types/pg`, `@electric-sql/pglite@0.5.5`. `corepack pnpm install` to update the lockfile.
 
-- [ ] **Step 2: Write the failing schema and migration tests**
+- [x] **Step 2: Write the failing schema and migration tests**
   `schema.test.ts` (pglite): migrate an empty database; assert all 7 tables exist; insert a draft endpoint; enforce unique public-id; enforce partial unique fingerprint/tx-hash; enforce Auth.js account/session uniqueness. `client.test.ts`: pool connect against pglite via `postgresql://` over a `pg-mem`-style shim OR skip (pool requires real server; instead test only migration + schema on pglite). `migrate.test.ts`: `runMigrations` on pglite applies all migrations exactly once (idempotent).
 
-- [ ] **Step 3: Implement schema, client, migrate**
+- [x] **Step 3: Implement schema, client, migrate**
   Use `pgTable` with `uuid` PK `default gen_random_uuid()`, `timestamptz`, `text` atomic amounts, checks, `uniqueIndex`. `client.ts` uses `drizzle-orm/node-postgres` `PgPool`. `migrate.ts` uses `drizzle-orm/node-postgres/migrator`.
 
-- [ ] **Step 4: Generate migrations and make tests green**
+- [x] **Step 4: Generate migrations and make tests green**
   `corepack pnpm --dir web exec drizzle-kit generate --config web/drizzle.config.ts`. Verify `pglite` accepts the emitted DDL. Run `corepack pnpm --dir web test`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   `git add -A && git commit -m "feat: add PostgreSQL gateway database foundation"`
 
 ---
@@ -122,16 +122,16 @@
 - Produces: `verifySession()` DAL returning the current seller or null; `requireSeller()` redirect for server components/actions.
 - Invariant: no passwords; sessions live in PostgreSQL.
 
-- [ ] **Step 1: Failing env/DAL tests**
+- [x] **Step 1: Failing env/DAL tests**
   Env: missing `AUTH_SECRET` fails in production; placeholder `INVALID_CHANGE_ME_...` secrets rejected; both providers required in production, one tolerated locally; `AUTH_EMAIL_FROM`/`AUTH_EMAIL_SERVER` validity; `AUTH_TRUST_HOST` gating. DAL: returns seller for a valid session on pglite, null otherwise.
 
-- [ ] **Step 2: Implement env parsing, auth config, route, DAL**
+- [x] **Step 2: Implement env parsing, auth config, route, DAL**
   Follow the local Next.js 16 docs (`node_modules/next/dist/docs/01-app/02-guides/authentication.md`) and Auth.js v5 App Router pattern. Strict provider derivation from validated env.
 
-- [ ] **Step 3: Wire a sign-in page and landing CTA**
+- [x] **Step 3: Wire a sign-in page and landing CTA**
   `/login` page and a seller CTA on the landing page.
 
-- [ ] **Step 4: GREEN + commit**
+- [x] **Step 4: GREEN + commit**
   `corepack pnpm --dir web test` and lint pass, then `git add -A && git commit -m "feat: add Auth.js passwordless seller authentication"`
 
 ---
@@ -149,9 +149,9 @@
 - Produces: `encryptSecret(plaintext, keyVersion, keys): EncryptedSecret` and `decryptSecret(record, keys): string` throwing a secret-free `SecretDecryptionError` on wrong key, tamper, or missing version.
 - Invariant: one new random 96-bit IV per encryption; AES-256-GCM; ciphertext/IV/tag/version stored; plaintext never logged, returned, or serialized into client props.
 
-- [ ] **Step 1: Failing crypto tests** (round-trip; fresh IV; wrong key; tamper; missing version; error text has no plaintext)
-- [ ] **Step 2: Implement `secrets.ts` with `node:crypto`**
-- [ ] **Step 3: GREEN + commit** `git add -A && git commit -m "feat: encrypt upstream credentials with AES-256-GCM"`
+- [x] **Step 1: Failing crypto tests** (round-trip; fresh IV; wrong key; tamper; missing version; error text has no plaintext)
+- [x] **Step 2: Implement `secrets.ts` with `node:crypto`**
+- [x] **Step 3: GREEN + commit** `git add -A && git commit -m "feat: encrypt upstream credentials with AES-256-GCM"`
 
 ---
 
@@ -175,12 +175,12 @@
 - Produces: server actions `createEndpoint`, `updateEndpoint`, `replaceCredential`, `activateEndpoint`, `pauseEndpoint`, `changePrice`/`changePayout` (recent-auth confirmation for active endpoints), `testConnectivity`.
 - Invariant: dashboard shows only a "credential configured/absent" flag, never the secret; price/payout change on an active endpoint requires recent-auth confirmation.
 
-- [ ] **Step 1: Failing validator + repository tests**
+- [x] **Step 1: Failing validator + repository tests**
   Price table (valid/invalid boundary); payTo checksum/placeholder; URL rules; status transition matrix with audit rows; owner isolation; unknown public id null.
-- [ ] **Step 2: Implement validators, url, repository**
-- [ ] **Step 3: Failing action/UI tests then implement server actions and pages**
+- [x] **Step 2: Implement validators, url, repository**
+- [x] **Step 3: Failing action/UI tests then implement server actions and pages**
   Action tests on pglite with a fake session; component tests assert secrets never render.
-- [ ] **Step 4: GREEN + commit** `git add -A && git commit -m "feat: add endpoint configuration and dashboard CRUD"`
+- [x] **Step 4: GREEN + commit** `git add -A && git commit -m "feat: add endpoint configuration and dashboard CRUD"`
   Committed as `b002c33`. File layout differs from the plan: components live under `web/src/components/dashboard/*` (not `web/src/features/gateway/dashboard/*`) to match the existing app structure; action tests are split across `service.test.ts` and a later-added `actions.test.ts` (connectivity action, committed with Task 5 wiring).
 
 ---
@@ -297,9 +297,11 @@ Implementation notes (commit `755444b`): `web/src/db/migrate.ts` refactored so `
 - Produces: Playwright coverage: sign-in through a test provider; create draft; configure Bearer and X-API-Key; test connectivity; activate; copy gateway URL; view metrics; pause; replace credential; cross-user access denied.
 - Invariant: existing `agentpay.spec.ts` premium/basic checks remain green; smoke preview unchanged.
 
-- [ ] **Step 1: Failing e2e tests then implement test provider/seeding support**
-- [ ] **Step 2: Run full suite** `corepack pnpm test; corepack pnpm typecheck; corepack pnpm build; corepack pnpm --dir web lint; corepack pnpm --dir web test:e2e; corepack pnpm smoke:preview`
-- [ ] **Step 3: Commit** `git add -A && git commit -m "test: verify hosted gateway flows end-to-end"`
+- [x] **Step 1: Failing e2e tests then implement test provider/seeding support**
+- [x] **Step 2: Run full suite** `corepack pnpm test; corepack pnpm typecheck; corepack pnpm build; corepack pnpm --dir web lint; corepack pnpm --dir web test:e2e; corepack pnpm smoke:preview`
+- [x] **Step 3: Commit** `git add -A && git commit -m "test: verify hosted gateway flows end-to-end"`
+
+Implementation notes (commit `b50c03e`): Playwright now starts a deterministic local stack with PostgreSQL, Redis, the app, fake GitHub, SMTP, facilitator, and a pinned public-address upstream. Desktop and mobile coverage exercises both sign-in methods, Bearer/X-API-Key setup, connectivity, activation, a complete x402 settlement, replay rejection, metrics, credential rotation, pause, and owner isolation. Parallel tests use unique payment nonces and transactions. Existing premium/basic browser checks remain green.
 
 ---
 
@@ -313,19 +315,19 @@ Implementation notes (commit `755444b`): `web/src/db/migrate.ts` refactored so `
 - Produces: runbook covering one-server topology with Postgres, secret management (`AUTH_SECRET`, GitHub/SMTP, `AGENTPAY_MASTER_KEY`), one-shot migration step, postgres backup/restore, `AGENTPAY_MASTER_KEY` rotation, payment-event reconciliation, rollback for the 4-service stack, and incident stop conditions.
 - Produces: updated README/landing describing seller onboarding and gateway limits without revealing secrets.
 
-- [ ] **Step 1: Write the runbook and update docs**
-- [ ] **Step 2: Final full verification and plan self-review checklist**
-- [ ] **Step 3: Commit** `git add -A && git commit -m "docs: document hosted GET gateway operations"`
+- [x] **Step 1: Write the runbook and update docs**
+- [x] **Step 2: Final full verification and plan self-review checklist**
+- [x] **Step 3: Commit** `git add -A && git commit -m "docs: document hosted GET gateway operations"`
 
 ---
 
 ## Plan Self-Review Checklist
 
-- [ ] All success criteria from `docs/superpowers/specs/2026-08-16-hosted-get-gateway-design.md` are demonstrated by tests in this branch.
-- [ ] `/api/premium` and `/api/basic` behavior and clean-room smoke previews remain green and unchanged.
-- [ ] Full unit, integration, typecheck, lint, build, and Playwright suites pass without spending funds.
-- [ ] Concurrency tests prove the upstream executes at most once.
-- [ ] Upstream failures never settle; settlement success is never converted into an error by event-persistence failures.
-- [ ] No secret, payment signature, query value, or paid body appears in any log, test output, or serialized props.
-- [ ] PostgreSQL publishes no host port; only `web` is publicly routed; migrations are an explicit one-shot step.
-- [ ] The feature branch is clean and contains only intentional commits; nothing was pushed or merged.
+- [x] All success criteria from `docs/superpowers/specs/2026-08-16-hosted-get-gateway-design.md` are demonstrated by tests in this branch.
+- [x] `/api/premium` and `/api/basic` behavior and clean-room smoke previews remain green and unchanged.
+- [x] Full unit, integration, typecheck, lint, build, and Playwright suites pass without spending funds.
+- [x] Concurrency tests prove the upstream executes at most once.
+- [x] Upstream failures never settle; settlement success is never converted into an error by event-persistence failures.
+- [x] No secret, payment signature, query value, or paid body appears in any log, test output, or serialized props.
+- [x] PostgreSQL publishes no host port; only `web` is publicly routed; migrations are an explicit one-shot step.
+- [x] The feature branch is clean and contains only intentional commits; nothing was pushed or merged.

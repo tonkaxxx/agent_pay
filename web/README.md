@@ -57,15 +57,20 @@ mainnet commands.
 
 ## Production Compose
 
-`docker-compose.production.yml` runs exactly `web`, `facilitator`, and
-authenticated persistent Redis from one Compose project. Web and Redis traffic
-stays on the internal backend network. Only facilitator receives an outbound
-gateway to Base RPC; only web joins the external Traefik `web-net`.
+`docker-compose.production.yml` runs `web`, `facilitator`, authenticated
+persistent Redis, PostgreSQL, and the one-shot `migrate` job from one Compose
+project. Database and cache traffic stays on the internal backend network.
+Only facilitator receives the dedicated Base RPC egress network; only web joins
+the external Traefik `web-net`.
 
 Copy `.env.production.example` to the ignored `.env.production`, set mode
 `0600`, and replace every placeholder. `AGENTPAY_IMAGE` must use the full
 40-character release commit as its tag (or an image digest); mutable tags such
 as `latest` are rejected by the production verifier.
+
+Run `migrate` successfully before recreating `web`. Backup, restore, key
+rotation, reconciliation, rollback, and incident procedures are in
+`docs/operations/hosted-get-gateway-runbook.md`.
 
 ## Verification
 
