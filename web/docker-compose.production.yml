@@ -29,6 +29,7 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:?set a URL-safe Redis password}@redis:6379/0
       DATABASE_URL: postgres://${POSTGRES_USER:?set the PostgreSQL user}:${POSTGRES_PASSWORD:?set the PostgreSQL password}@postgres:5432/${POSTGRES_DB:?set the PostgreSQL database}
       AUTH_SECRET: ${AUTH_SECRET:?set the Auth.js secret}
+      AUTH_TRUST_HOST: "true"
       AUTH_GITHUB_ID: ${AUTH_GITHUB_ID:?set the GitHub OAuth client id}
       AUTH_GITHUB_SECRET: ${AUTH_GITHUB_SECRET:?set the GitHub OAuth client secret}
       AUTH_EMAIL_SERVER: ${AUTH_EMAIL_SERVER:?set the SMTP URL}

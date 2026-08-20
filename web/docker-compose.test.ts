@@ -133,6 +133,7 @@ describe("production Compose policy", () => {
       REDIS_URL: "redis://:test-only-redis-password@redis:6379/0",
       DATABASE_URL:
         "postgres://agentpay:test-only-postgres-password@postgres:5432/agentpay",
+      AUTH_TRUST_HOST: "true",
     });
     expect(Object.keys(web)).not.toEqual(expect.arrayContaining([
       "AGENT_PRIVATE_KEY",
