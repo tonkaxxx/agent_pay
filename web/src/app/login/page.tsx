@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   description: "Passwordless seller sign-in for the AgentPay hosted GET gateway.",
 };
 
+// Auth providers are runtime-only secrets and must never be captured in the build output.
+export const dynamic = "force-dynamic";
+
 export default function LoginPage() {
   const github = authEnvironment.github !== undefined;
   const email = authEnvironment.email !== undefined;
