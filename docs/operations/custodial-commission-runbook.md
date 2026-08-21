@@ -1,5 +1,10 @@
 # Custodial 5% commission runbook
 
+Production status: active for hosted `GET /g/<public-id>` routes on Base
+Mainnet. The collection wallet is
+`0x7C04bf9fFd46EAeF9101F4aC558C13fb569923E6`; confirmed 5% fees are swept to
+`0x748BB9bDA321B434DA83F402Cc8152eD23668a9a`.
+
 This mode keeps the public seller gateway compatible with standard x402 v2
 `exact`, but changes the on-chain recipient for `GET /g/<public-id>` to an
 AgentPay collection wallet. The buyer price is the total: 95% becomes a seller
@@ -22,12 +27,13 @@ Use three different wallets:
 The collection key must exist only in the `payout-worker` environment. Never
 put it in web, facilitator, source control, shell history, a prompt, or logs.
 The configured collection address must match the key or the worker refuses to
-start. Keep at least 0.001 ETH in the collection wallet; falling below it
+start. Keep at least 0.0001 ETH in the collection wallet; falling below it
 automatically pauses new custodial settlements.
 
 ## Configuration and rollout
 
-Start from `web/.env.production.example`. Keep the first deploy in ledger mode:
+Start from `web/.env.production.example`. Use ledger mode for the first deploy
+or an emergency rollback:
 
 ```dotenv
 AGENTPAY_FEE_MODE=ledger
@@ -59,6 +65,9 @@ docker compose --profile custodial --env-file web/.env.production \
 Verify an unpaid seller endpoint. `PAYMENT-REQUIRED` must still advertise
 x402 v2, Base, official USDC and the buyer total, but `payTo` must equal the
 collection address. The compact unpaid body must not contain upstream data.
+Verify that `payout-worker` stays running, `finance-cli.mjs status` reports a
+fresh heartbeat and `paused: false`, and the collection balance is at least
+`0.0001 ETH`.
 
 ## Accounting behavior
 
@@ -67,9 +76,13 @@ collection address. The compact unpaid body must not contain upstream data.
 - Schedule changes apply to all settled obligations not yet batched.
 - Default schedule is payout at 1 USDC seller net or after seven days.
 - `threshold` waits until seller net reaches 1 USDC.
-- New batches are prepared once daily after 03:00 UTC.
-- Transfers need two Base confirmations. A stuck transaction is replaced after
-  ten minutes with the same nonce and higher fees, at most three attempts.
+- The worker automatically attempts batch preparation once after 03:00 UTC per
+  uninterrupted process day. A worker restart after 03:00 or an operator
+  `run-now` can trigger another attempt; already-batched obligations are not
+  batched again.
+- Incoming settlement and outgoing transfers need two Base confirmations. A
+  stuck outgoing transaction is replaced after ten minutes with the same nonce
+  and higher fees, at most three attempts.
 - Seller liability is released only after the seller transfer confirms.
 - The 5% treasury sweep is prepared only from confirmed seller batches.
 - Unknown direct USDC deposits are ignored by the ledger.
@@ -94,6 +107,10 @@ authorizations every five minutes. Reconciliation requires both USDC
 `AuthorizationUsed` and the matching successful `Transfer` to the collection
 wallet before it marks a payment settled. Expired unused authorizations are
 cancelled and their reserved liability is released.
+
+The current `0.0001 ETH` gas floor is an emergency low-balance operating
+threshold, not a funding target. Alert before the collection balance reaches
+it; every payout and fee sweep consumes Base gas.
 
 ## Incident and rollback
 

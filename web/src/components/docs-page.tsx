@@ -51,6 +51,14 @@ AGENT_PRIVATE_KEY=<YOUR_NEW_LOW_BALANCE_PRIVATE_KEY>
 Fetch data from the following API endpoint:
 https://agentpay.thebestsites.ru/api/premium`;
 
+const hostedGateway = `Upstream       https://your-api.example/data
+Public route   https://agentpay.thebestsites.ru/g/<publicId>
+Method         GET
+Payment        x402 v2 exact · Base USDC`;
+
+const productionWallets = `Collection   0x7C04bf9fFd46EAeF9101F4aC558C13fb569923E6
+Treasury     0x748BB9bDA321B434DA83F402Cc8152eD23668a9a`;
+
 const statuses = [
   ["402", "Payment required", "Read PAYMENT-REQUIRED, apply wallet policy, then sign once."],
   ["200", "Settled", "Read the resource and decode PAYMENT-RESPONSE."],
@@ -82,6 +90,8 @@ export function DocsPage() {
             <a href="#contract">Protocol contract</a>
             <a href="#status">Status codes</a>
             <a href="#agent">Pay with an agent</a>
+            <a href="#seller">Sell a GET API</a>
+            <a href="#payouts">Commission & payouts</a>
           </nav>
         </aside>
 
@@ -187,6 +197,55 @@ export function DocsPage() {
                   <span>Use a new dedicated low-balance wallet. Never paste a primary or previously shared key.</span>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <section className="docs-section" id="seller">
+            <div className="docs-section-number">06</div>
+            <div className="docs-section-content">
+              <div className="docs-icon"><Package aria-hidden="true" /></div>
+              <h2>Sell an existing GET API</h2>
+              <p>
+                Sign in, paste one existing HTTPS GET upstream, choose Bearer or{" "}
+                <code>X-API-Key</code> authentication, set a fixed USDC price and seller payout
+                address, test connectivity, and activate. AgentPay returns a public
+                <code>/g/&lt;publicId&gt;</code> URL that any standard x402 v2 client can call.
+              </p>
+              <CodeBlock label="Hosted gateway" code={hostedGateway} />
+              <p>
+                <Link href="/dashboard">Open seller dashboard</Link>. Upstream credentials stay
+                encrypted and are never returned by the dashboard or exposed in the unpaid 402.
+              </p>
+            </div>
+          </section>
+
+          <section className="docs-section" id="payouts">
+            <div className="docs-section-number">07</div>
+            <div className="docs-section-content">
+              <div className="docs-icon"><ServerCog aria-hidden="true" /></div>
+              <h2>Commission and seller payouts</h2>
+              <p>
+                Production hosted routes use custodial settlement. The buyer pays the advertised
+                total to AgentPay&apos;s collection wallet. AgentPay records a 95% seller liability
+                and a 5% commission without increasing the buyer price.
+              </p>
+              <CodeBlock label="Base Mainnet wallets" code={productionWallets} />
+              <p>
+                A seller batch becomes eligible at 1 USDC seller net or after seven days. The
+                automatic preparation window opens after 03:00 UTC; operators can also trigger an
+                additional preparation cycle. Incoming payments and outgoing transfers require
+                two Base confirmations. Seller liability is released only after the payout
+                confirms, and the 5% treasury sweep is prepared only from confirmed seller batches.
+              </p>
+              <p>
+                The collection wallet needs Base ETH for payout gas. New custodial settlements
+                pause if its balance falls below the emergency floor of 0.0001 ETH.
+              </p>
+              <p className="docs-footnote">
+                <code>/api/premium</code> is a separate demo endpoint priced at 0.01 USDC and does
+                not use the hosted gateway commission ledger. The 95/5 model applies to
+                <code>/g/&lt;publicId&gt;</code> seller routes.
+              </p>
             </div>
           </section>
         </main>

@@ -40,7 +40,7 @@ HTTP override. Production continues to require the canonical HTTPS origin.
 | `AGENTPAY_PAY_TO` | Controlled Base recipient for the exact 0.01 USDC payment |
 | `FACILITATOR_URL` | Internal HTTP URL, normally `http://facilitator:4022` |
 | `REDIS_URL` | Internal authenticated `redis://` authorization state store |
-| `AGENTPAY_FEE_MODE` | `ledger` (default) or `custodial` for hosted 95/5 payouts |
+| `AGENTPAY_FEE_MODE` | `ledger` for safe rollout/rollback or `custodial` for hosted 95/5 payouts |
 | `AGENTPAY_GATEWAY_COLLECTION_ADDRESS` | Public collection address; never its private key |
 | `AGENTPAY_CUSTODY_LEGAL_APPROVED` | Explicit `true` release gate after legal approval |
 
@@ -62,7 +62,8 @@ mainnet commands.
 
 `docker-compose.production.yml` runs `web`, `facilitator`, authenticated
 persistent Redis, PostgreSQL, and the one-shot `migrate` job from one Compose
-project. Its optional `custodial` profile adds a private payout worker. Database
+project. Its `custodial` profile adds a private payout worker and is active in
+the current production deployment. Database
 and cache traffic stays on the internal backend network. Only facilitator and
 payout worker receive Base RPC egress; only web joins the external Traefik
 `web-net`. The payout private key is injected only into the worker.
@@ -77,6 +78,15 @@ rotation, reconciliation, rollback, and incident procedures are in
 `docs/operations/hosted-get-gateway-runbook.md`.
 Custodial rollout, pause, reconciliation, and payout operations are documented
 in `docs/operations/custodial-commission-runbook.md`.
+
+Current public Base Mainnet roles are:
+
+- collection: `0x7C04bf9fFd46EAeF9101F4aC558C13fb569923E6`;
+- 5% treasury: `0x748BB9bDA321B434DA83F402Cc8152eD23668a9a`.
+
+The payout worker requires the collection key to match the collection address,
+keeps it out of web and facilitator, and pauses finance below `0.0001 ETH` of
+Base gas.
 
 ## Verification
 

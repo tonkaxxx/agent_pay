@@ -33,13 +33,27 @@ Sellers sign in with GitHub or a passwordless email link, enter one fixed HTTPS
 GET upstream, choose Bearer or `X-API-Key`, set a USDC price and Base payout
 address, test connectivity, and publish `GET /g/<public-id>`. AgentPay handles
 x402 v2, replay protection, SSRF-safe proxying, encrypted credentials,
-settlement metrics, and an optional custodial 5% commission mode. In that mode
+settlement metrics, and a custodial 5% commission mode. In that mode
 the buyer still uses standard x402 v2 `exact`, while AgentPay receives the
 buyer total, accrues 95% to the seller, pays sellers daily, and sweeps the 5%
-fee only after the seller payout confirms. The legacy direct-settlement mode
-remains the safe default.
+fee only after the seller payout confirms. Production currently runs this
+custodial mode; `ledger` remains the safe rollout and rollback mode.
 
 See [the hosted gateway runbook](docs/operations/hosted-get-gateway-runbook.md).
+
+### Production 95/5 settlement
+
+Hosted seller routes use these public Base Mainnet wallets:
+
+- collection: `0x7C04bf9fFd46EAeF9101F4aC558C13fb569923E6`;
+- AgentPay treasury: `0x748BB9bDA321B434DA83F402Cc8152eD23668a9a`.
+
+The buyer price does not increase: 95% becomes a seller liability and 5%
+becomes AgentPay commission. A seller batch is eligible at 1 USDC seller net or
+after seven days. The automatic preparation window opens after 03:00 UTC, and
+operators can trigger an additional cycle when needed. The treasury sweep is
+created only after the seller payout confirms. `GET /api/premium` is a separate
+0.01 USDC demonstration endpoint and does not use this commission ledger.
 
 ## Prompt-only agent access
 
@@ -94,15 +108,17 @@ they construct a signer. They do not read an RPC URL.
 - `packages/facilitator`: internal Base Mainnet verifier and settlement service.
 - `web`: Next.js landing page, docs and the protected API.
 - `scripts/smoke`: official TypeScript and Python buyer compatibility checks.
-- `docs/superpowers/specs`: approved security and architecture design.
-- `docs/superpowers/plans`: implementation and verification plan.
+- `docs/README.md`: current documentation index and source-of-truth order.
+- `docs/operations`: current production runbooks.
+- `docs/superpowers`: historical dated designs and implementation plans.
 
 Production runs `web`, `facilitator`, authenticated persistent Redis,
-PostgreSQL, a one-shot migration job, and (when the `custodial` profile is
-enabled) an internal payout worker on one server and one Docker Compose
-project. Only `web` is attached to public ingress. See the
+PostgreSQL, a one-shot migration job, and an internal payout worker on one
+server and one Docker Compose project. Only `web` is attached to public ingress.
+The payout worker automatically pauses finance if collection-wallet gas drops
+below `0.0001 ETH`. See the
 [custodial commission runbook](docs/operations/custodial-commission-runbook.md)
-before enabling custody.
+for rollout, reconciliation, payout and incident procedures.
 
 ## Local development
 

@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 
 import type { ActionState } from "@/features/gateway/actions";
 import type { EndpointSummary } from "@/features/gateway/repository";
@@ -8,6 +8,8 @@ import type { EndpointSummary } from "@/features/gateway/repository";
 import { EndpointDetails } from "./endpoint-details";
 import { EndpointForm } from "./endpoint-form";
 import { EndpointList } from "./endpoint-list";
+
+afterEach(() => cleanup());
 
 const ok = () => Promise.resolve({} as ActionState);
 

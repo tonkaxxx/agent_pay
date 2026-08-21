@@ -46,3 +46,27 @@ test("offers the exact safe one-prompt example and states the agent capability b
     "#agent",
   );
 });
+
+test("documents the hosted seller gateway and active custodial economics", () => {
+  const { container } = render(<DocsPage />);
+  const text = container.textContent ?? "";
+
+  expect(screen.getByRole("heading", { level: 2, name: /sell an existing get api/i }))
+    .toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /open seller dashboard/i })).toHaveAttribute(
+    "href",
+    "/dashboard",
+  );
+  expect(text).toContain("/g/<publicId>");
+  expect(text).toMatch(/5% commission/i);
+  expect(text).toMatch(/95% seller liability/i);
+  expect(text).toContain("0x7C04bf9fFd46EAeF9101F4aC558C13fb569923E6");
+  expect(text).toContain("0x748BB9bDA321B434DA83F402Cc8152eD23668a9a");
+  expect(text).toMatch(/1 USDC seller net/i);
+  expect(text).toMatch(/seven days/i);
+  expect(text).toMatch(/after 03:00 UTC/i);
+  expect(text).toMatch(/two Base confirmations/i);
+  expect(text).toContain("0.0001 ETH");
+  expect(text).toMatch(/\/api\/premium.*separate demo/is);
+  expect(text).not.toMatch(/AGENTPAY_PAYOUT_PRIVATE_KEY=0x[0-9a-fA-F]{64}/);
+});
