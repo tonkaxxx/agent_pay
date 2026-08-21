@@ -69,6 +69,10 @@ describe("metricsForEndpoint", () => {
       paidCount: 0,
       gmvAtomic: "0",
       commissionAtomic: "0",
+      sellerNetAtomic: "0",
+      pendingPayoutAtomic: "0",
+      paidOutAtomic: "0",
+      payoutTransactions: [],
       uniquePayers: 0,
       repeatedPayers: 0,
       upstreamSuccessRate: null,
@@ -165,5 +169,49 @@ describe("metricsForEndpoint", () => {
     const metrics = await metricsForEndpoint(tdb.db, endpoint.id);
     expect(metrics.paidCount).toBe(1);
     expect(metrics.gmvAtomic).toBe("1000000");
+  });
+
+  it("reports custodial seller balances and confirmed payout transactions", async () => {
+    const [batch] = await tdb.db.insert(schema.payoutBatches).values({
+      sellerPayTo: PAYER_A,
+      sellerNetAtomic: "950000",
+      commissionAtomic: "50000",
+      status: "confirmed",
+      confirmedAt: new Date(),
+    }).returning();
+    await tdb.db.insert(schema.settlementObligations).values({
+      endpointId: endpoint.id,
+      payoutBatchId: batch!.id,
+      requestId: "custodial-request",
+      fingerprint: "custodial-fingerprint",
+      payerAddress: PAYER_B,
+      authorizationNonce: `0x${"ab".repeat(32)}`,
+      authorizationValidBefore: new Date("2026-08-21T10:00:00Z"),
+      sellerPayTo: PAYER_A,
+      grossAtomic: "1000000",
+      commissionAtomic: "50000",
+      sellerNetAtomic: "950000",
+      settlementStatus: "settled",
+      settlementTxHash: `0x${"12".repeat(32)}`,
+    });
+    await tdb.db.insert(schema.outgoingTransferAttempts).values({
+      businessKey: `payout:${batch!.id}`,
+      transferKind: "seller",
+      attemptNumber: 1,
+      nonce: "1",
+      recipient: PAYER_A,
+      amountAtomic: "950000",
+      rawTransaction: "0x02",
+      txHash: `0x${"34".repeat(32)}`,
+      status: "confirmed",
+    });
+
+    const metrics = await metricsForEndpoint(tdb.db, endpoint.id);
+    expect(metrics).toMatchObject({
+      sellerNetAtomic: "950000",
+      pendingPayoutAtomic: "0",
+      paidOutAtomic: "950000",
+      payoutTransactions: [`0x${"34".repeat(32)}`],
+    });
   });
 });

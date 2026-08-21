@@ -29,6 +29,9 @@ export async function createTestDatabase(): Promise<TestDatabase> {
 
 export async function resetTestDatabase(tdb: TestDatabase): Promise<void> {
   await tdb.sql.exec(
-    'TRUNCATE TABLE account, audit_event, authenticator, merchant_endpoint, payment_event, session, "user", "verificationToken" RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE account, audit_event, authenticator, fee_sweep, merchant_endpoint, outgoing_transfer_attempt, payment_event, payout_batch, session, settlement_obligation, "user", "verificationToken" RESTART IDENTITY CASCADE',
+  );
+  await tdb.sql.exec(
+    "UPDATE finance_state SET paused = false, pause_reason = NULL, reserved_seller_net_atomic = '0', worker_heartbeat_at = NULL, reconciled_at = NULL, updated_at = now() WHERE id = 1",
   );
 }

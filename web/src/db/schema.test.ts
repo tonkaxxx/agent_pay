@@ -29,13 +29,40 @@ describe("migrated schema", () => {
         "agentpay_migrations",
         "audit_event",
         "authenticator",
+        "fee_sweep",
+        "finance_state",
         "merchant_endpoint",
+        "outgoing_transfer_attempt",
         "payment_event",
+        "payout_batch",
         "session",
+        "settlement_obligation",
         "user",
         "verificationToken",
       ].sort(),
     );
+  });
+
+  it("defaults existing seller endpoints to weekly-fallback payouts", async () => {
+    await tdb.sql.query(
+      'INSERT INTO "user" (id, email) VALUES (\'00000000-0000-0000-0000-000000000001\', \'policy@example.test\')',
+    );
+    await tdb.sql.query(
+      "INSERT INTO merchant_endpoint (public_id, owner_id, display_name, upstream_url, auth_mode, pay_to, amount_atomic, status) VALUES ('policy-1', '00000000-0000-0000-0000-000000000001', 'Policy', 'https://upstream.example/p', 'none', '0x0000000000000000000000000000000000000001', '1000000', 'draft')",
+    );
+    const { rows } = await tdb.sql.query<{ payout_policy: string }>(
+      "SELECT payout_policy FROM merchant_endpoint WHERE public_id = 'policy-1'",
+    );
+    expect(rows[0]?.payout_policy).toBe("threshold_or_weekly");
+  });
+
+  it("creates one finance-state singleton with a zero reserved liability", async () => {
+    const { rows } = await tdb.sql.query<{
+      id: number;
+      paused: boolean;
+      reserved_seller_net_atomic: string;
+    }>("SELECT id, paused, reserved_seller_net_atomic FROM finance_state");
+    expect(rows).toEqual([{ id: 1, paused: false, reserved_seller_net_atomic: "0" }]);
   });
 
   it("enforces a unique public_id on merchant_endpoint", async () => {

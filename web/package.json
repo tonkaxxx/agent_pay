@@ -13,6 +13,8 @@
     "prebuild": "corepack pnpm run build:sdk",
     "build": "next build",
     "build:migrate": "esbuild src/db/migrate-cli.ts --bundle --platform=node --format=esm --target=node22 --minify --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=scripts/migrate.mjs",
+    "build:worker": "esbuild src/worker/payout-worker.ts --bundle --platform=node --format=esm --target=node22 --minify --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=scripts/payout-worker.mjs",
+    "build:finance-cli": "esbuild src/worker/finance-cli.ts --bundle --platform=node --format=esm --target=node22 --minify --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=scripts/finance-cli.mjs",
     "start": "next start",
     "pretypecheck": "corepack pnpm run build:sdk",
     "typecheck": "tsc --noEmit",

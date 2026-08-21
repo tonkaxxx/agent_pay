@@ -8,6 +8,7 @@ import { CopyField } from "./copy-field";
 import { ConnectivityForm } from "./connectivity-form";
 import { CredentialForm } from "./credential-form";
 import { MoneyForm } from "./money-form";
+import { PayoutPolicyForm } from "./payout-policy-form";
 import { StatusForm } from "./status-form";
 import dashboardStyles from "./dashboard.module.css";
 
@@ -29,10 +30,12 @@ export interface EndpointDetailsProps {
   readonly endpoint: EndpointSummary;
   readonly gatewayUrl: string;
   readonly recent: boolean;
+  readonly custodial?: boolean;
   readonly statusAction: (previous: ActionState, formData: FormData) => Promise<ActionState>;
   readonly credentialAction: (previous: ActionState, formData: FormData) => Promise<ActionState>;
   readonly payoutAction: (previous: ActionState, formData: FormData) => Promise<ActionState>;
   readonly priceAction: (previous: ActionState, formData: FormData) => Promise<ActionState>;
+  readonly payoutPolicyAction: (previous: ActionState, formData: FormData) => Promise<ActionState>;
   readonly connectivityAction: (previous: ActionState, formData: FormData) => Promise<ActionState>;
 }
 
@@ -40,10 +43,12 @@ export function EndpointDetails({
   endpoint,
   gatewayUrl,
   recent,
+  custodial = false,
   statusAction,
   credentialAction,
   payoutAction,
   priceAction,
+  payoutPolicyAction,
   connectivityAction,
 }: EndpointDetailsProps) {
   const editable = endpoint.status !== "active";
@@ -69,8 +74,9 @@ export function EndpointDetails({
           <path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 1 1 0 10h-2" />
         </svg>
         <span className="hint">
-          Transactions settle directly to your payout address on Base. AgentPay takes a 5%
-          commission.
+          {custodial
+            ? "Buyers pay the displayed price in USDC on Base. AgentPay deducts 5% and sends 95% to your snapshotted payout address on the selected schedule."
+            : "Transactions settle directly to your payout address on Base. Commission is recorded for analytics but is not collected in ledger mode."}
         </span>
       </div>
 
@@ -125,9 +131,20 @@ export function EndpointDetails({
         action={payoutAction}
         fieldName="payTo"
         label="Base payout address"
-        explainer="Settlement and commissions go here. Applies to future confirmed payments."
+        explainer={custodial
+          ? "Your 95% seller payouts go here. The address is snapshotted for each payment."
+          : "Direct x402 settlement goes here in ledger mode."}
         defaultValue={endpoint.payTo}
       />
+
+      {custodial ? (
+        <PayoutPolicyForm
+          endpointId={endpoint.id}
+          defaultValue={endpoint.payoutPolicy}
+          disabled={!armed}
+          action={payoutPolicyAction}
+        />
+      ) : null}
 
       <MoneyForm
         endpointId={endpoint.id}

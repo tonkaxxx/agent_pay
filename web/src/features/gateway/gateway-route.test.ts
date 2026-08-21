@@ -17,6 +17,7 @@ const endpoint: EndpointRecord = {
   authMode: "none",
   payTo: "0x0000000000000000000000000000000000001234",
   amountAtomic: "1000000",
+  payoutPolicy: "threshold_or_weekly",
   status: "active",
   configVersion: 1,
   secretConfigured: false,

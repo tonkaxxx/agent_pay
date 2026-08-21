@@ -9,6 +9,7 @@ import styles from "@/components/dashboard/dashboard.module.css";
 import { getDatabase } from "@/db";
 import {
   changePayoutAction,
+  changePayoutPolicyAction,
   changePriceAction,
   replaceCredentialAction,
   setStatusAction,
@@ -19,6 +20,7 @@ import { getEndpointForOwner } from "@/features/gateway/repository";
 import { hasRecentSignIn } from "@/features/gateway/service";
 import { requireSeller } from "@/lib/dal";
 import { publicSiteUrl } from "@/app/site-url";
+import { loadGatewayFinanceConfig } from "@/features/finance/config";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +47,7 @@ export default async function EndpointDetailPage({
   const gatewayUrl = new URL(`/g/${endpoint.publicId}`, publicSiteUrl()).toString();
   const recent = await hasRecentSignIn({ sellerId: seller.id, db: db.db });
   const metrics = await metricsForEndpoint(db.db, endpoint.id);
+  const finance = loadGatewayFinanceConfig(process.env);
 
   return (
     <main className={styles.dashboard}>
@@ -60,10 +63,12 @@ export default async function EndpointDetailPage({
         endpoint={endpoint}
         gatewayUrl={gatewayUrl}
         recent={recent}
+        custodial={finance.mode === "custodial"}
         statusAction={setStatusAction}
         credentialAction={replaceCredentialAction}
         payoutAction={changePayoutAction}
         priceAction={changePriceAction}
+        payoutPolicyAction={changePayoutPolicyAction}
         connectivityAction={testConnectivityAction}
       />
       <hr style={{ border: "1px solid var(--line)", margin: "28px 0" }} />

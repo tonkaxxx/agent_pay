@@ -40,6 +40,9 @@ HTTP override. Production continues to require the canonical HTTPS origin.
 | `AGENTPAY_PAY_TO` | Controlled Base recipient for the exact 0.01 USDC payment |
 | `FACILITATOR_URL` | Internal HTTP URL, normally `http://facilitator:4022` |
 | `REDIS_URL` | Internal authenticated `redis://` authorization state store |
+| `AGENTPAY_FEE_MODE` | `ledger` (default) or `custodial` for hosted 95/5 payouts |
+| `AGENTPAY_GATEWAY_COLLECTION_ADDRESS` | Public collection address; never its private key |
+| `AGENTPAY_CUSTODY_LEGAL_APPROVED` | Explicit `true` release gate after legal approval |
 
 Do not place any buyer key, facilitator key, Base RPC credential, or external
 facilitator credential in the web environment. The web config fails closed if
@@ -59,9 +62,10 @@ mainnet commands.
 
 `docker-compose.production.yml` runs `web`, `facilitator`, authenticated
 persistent Redis, PostgreSQL, and the one-shot `migrate` job from one Compose
-project. Database and cache traffic stays on the internal backend network.
-Only facilitator receives the dedicated Base RPC egress network; only web joins
-the external Traefik `web-net`.
+project. Its optional `custodial` profile adds a private payout worker. Database
+and cache traffic stays on the internal backend network. Only facilitator and
+payout worker receive Base RPC egress; only web joins the external Traefik
+`web-net`. The payout private key is injected only into the worker.
 
 Copy `.env.production.example` to the ignored `.env.production`, set mode
 `0600`, and replace every placeholder. `AGENTPAY_IMAGE` must use the full
@@ -71,6 +75,8 @@ as `latest` are rejected by the production verifier.
 Run `migrate` successfully before recreating `web`. Backup, restore, key
 rotation, reconciliation, rollback, and incident procedures are in
 `docs/operations/hosted-get-gateway-runbook.md`.
+Custodial rollout, pause, reconciliation, and payout operations are documented
+in `docs/operations/custodial-commission-runbook.md`.
 
 ## Verification
 

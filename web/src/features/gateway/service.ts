@@ -11,6 +11,7 @@ import {
   transitionEndpointStatus,
   updateEndpointDetails,
   updateEndpointPayout,
+  updateEndpointPayoutPolicy,
   updateEndpointPrice,
   updateEndpointSecret,
   type ConnectivityResultInput,
@@ -19,6 +20,7 @@ import {
   type GatewayDatabase,
 } from "./repository";
 import { encryptSecret, type KeyRing } from "./secrets";
+import { PAYOUT_POLICIES, type PayoutPolicy } from "@/features/finance/policy";
 
 export interface ServiceAuth {
   readonly sellerId: string;
@@ -198,6 +200,33 @@ export async function changeEndpointPrice(
   if (updated === null) {
     throw new ServiceError("Endpoint not found");
   }
+  return updated;
+}
+
+export async function changeEndpointPayoutPolicy(
+  auth: ServiceAuth,
+  endpointId: string,
+  policy: string,
+  recentAuth: boolean,
+): Promise<EndpointSummary> {
+  const current = await getEndpointRecord(auth.db, endpointId, auth.sellerId);
+  if (current === null) throw new ServiceError("Endpoint not found");
+  if (!PAYOUT_POLICIES.includes(policy as PayoutPolicy)) {
+    throw new ServiceError("Invalid payout schedule", "payoutPolicy");
+  }
+  if (current.status === "active" && !recentAuth) {
+    throw new ServiceError(
+      "Recent authentication required for payout policy changes on an active endpoint",
+      "confirmation",
+    );
+  }
+  const updated = await updateEndpointPayoutPolicy(
+    auth.db,
+    endpointId,
+    auth.sellerId,
+    policy as PayoutPolicy,
+  );
+  if (updated === null) throw new ServiceError("Endpoint not found");
   return updated;
 }
 

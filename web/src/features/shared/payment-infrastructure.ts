@@ -16,6 +16,7 @@ export interface GatewayPaymentInfrastructure {
 export interface GatewayInfrastructureConfig {
   readonly facilitatorUrl: string;
   readonly redisUrl: string;
+  readonly configureServer?: (server: x402ResourceServer) => void;
 }
 
 export interface GatewayInfrastructureDependencies {
@@ -49,6 +50,7 @@ export function buildGatewayInfrastructure(
   return Promise.resolve().then(() => {
     const facilitator = dependencies.createFacilitator(config.facilitatorUrl);
     const server = dependencies.createServer(facilitator);
+    config.configureServer?.(server);
     const redis = dependencies.createRedisClient(config.redisUrl);
     return {
       server,

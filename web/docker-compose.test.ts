@@ -29,6 +29,7 @@ interface ComposeConfig {
   services: {
     web: ComposeService;
     facilitator: ComposeService;
+    "payout-worker": ComposeService;
     redis: ComposeService;
     postgres: ComposeService;
     migrate: ComposeService;
@@ -49,6 +50,8 @@ function renderCompose(): ComposeConfig {
     "compose",
     "--file",
     composeFile,
+    "--profile",
+    "custodial",
     "config",
     "--format",
     "json",
@@ -59,6 +62,11 @@ function renderCompose(): ComposeConfig {
       AGENTPAY_IMAGE: immutableImage,
       NEXT_PUBLIC_SITE_URL: "https://agentpay.thebestsites.ru/",
       AGENTPAY_PAY_TO: "0x58B0fF9Fd53C854f3779acdE649a7FAc2de2d1CB",
+      AGENTPAY_FEE_MODE: "custodial",
+      AGENTPAY_GATEWAY_COLLECTION_ADDRESS: "0x1111111111111111111111111111111111111111",
+      AGENTPAY_PAYOUT_PRIVATE_KEY: `0x${"34".repeat(32)}`,
+      AGENTPAY_FEE_RECIPIENT: "0x2222222222222222222222222222222222222222",
+      AGENTPAY_CUSTODY_LEGAL_APPROVED: "true",
       BASE_MAINNET_RPC_URL: "https://base-rpc.invalid/",
       FACILITATOR_PRIVATE_KEY: `0x${"12".repeat(32)}`,
       REDIS_PASSWORD: "test-only-redis-password",
@@ -81,6 +89,7 @@ describe("production Compose policy", () => {
     expect(Object.keys(config.services).sort()).toEqual([
       "facilitator",
       "migrate",
+      "payout-worker",
       "postgres",
       "redis",
       "web",
@@ -88,6 +97,7 @@ describe("production Compose policy", () => {
     expect(config.services.web.image).toBe(immutableImage);
     expect(config.services.facilitator.image).toBe(immutableImage);
     expect(config.services.migrate.image).toBe(immutableImage);
+    expect(config.services["payout-worker"].image).toBe(immutableImage);
     expect(config.services.redis.image).toBe(
       "redis:7.4.7-alpine@sha256:02f2cc4882f8bf87c79a220ac958f58c700bdec0dfb9b9ea61b62fb0e8f1bfcf",
     );
@@ -108,10 +118,15 @@ describe("production Compose policy", () => {
     expect(Object.keys(config.services.redis.networks ?? {})).toEqual(["backend"]);
     expect(Object.keys(config.services.postgres.networks ?? {})).toEqual(["backend"]);
     expect(Object.keys(config.services.migrate.networks ?? {})).toEqual(["backend"]);
+    expect(Object.keys(config.services["payout-worker"].networks ?? {}).sort()).toEqual([
+      "backend",
+      "egress",
+    ]);
     expect(config.services.facilitator.ports).toBeUndefined();
     expect(config.services.redis.ports).toBeUndefined();
     expect(config.services.postgres.ports).toBeUndefined();
     expect(config.services.migrate.ports).toBeUndefined();
+    expect(config.services["payout-worker"].ports).toBeUndefined();
     expect(config.networks.egress.internal).not.toBe(true);
   });
 
@@ -128,6 +143,7 @@ describe("production Compose policy", () => {
     const web = config.services.web.environment ?? {};
     const facilitator = config.services.facilitator.environment ?? {};
     const postgres = config.services.postgres.environment ?? {};
+    const payoutWorker = config.services["payout-worker"].environment ?? {};
     expect(web).toMatchObject({
       FACILITATOR_URL: "http://facilitator:4022",
       REDIS_URL: "redis://:test-only-redis-password@redis:6379/0",
@@ -135,11 +151,15 @@ describe("production Compose policy", () => {
         "postgres://agentpay:test-only-postgres-password@postgres:5432/agentpay",
       AUTH_URL: "https://agentpay.thebestsites.ru/",
       AUTH_TRUST_HOST: "true",
+      AGENTPAY_FEE_MODE: "custodial",
+      AGENTPAY_GATEWAY_COLLECTION_ADDRESS: "0x1111111111111111111111111111111111111111",
     });
     expect(Object.keys(web)).not.toEqual(expect.arrayContaining([
       "AGENT_PRIVATE_KEY",
       "FACILITATOR_PRIVATE_KEY",
       "BASE_MAINNET_RPC_URL",
+      "AGENTPAY_PAYOUT_PRIVATE_KEY",
+      "AGENTPAY_FEE_RECIPIENT",
       "AGENTPAY_ALLOW_INSECURE_LOCAL_ORIGIN",
       "POSTGRES_PASSWORD",
       ["CDP", "API", "KEY", "ID"].join("_"),
@@ -150,6 +170,19 @@ describe("production Compose policy", () => {
       FACILITATOR_PRIVATE_KEY: `0x${"12".repeat(32)}`,
     });
     expect(Object.keys(facilitator)).not.toContain("AGENT_PRIVATE_KEY");
+    expect(Object.keys(facilitator)).not.toContain("AGENTPAY_PAYOUT_PRIVATE_KEY");
+    expect(payoutWorker).toMatchObject({
+      BASE_MAINNET_RPC_URL: "https://base-rpc.invalid/",
+      AGENTPAY_GATEWAY_COLLECTION_ADDRESS: "0x1111111111111111111111111111111111111111",
+      AGENTPAY_PAYOUT_PRIVATE_KEY: `0x${"34".repeat(32)}`,
+      AGENTPAY_FEE_RECIPIENT: "0x2222222222222222222222222222222222222222",
+    });
+    expect(Object.keys(payoutWorker)).not.toEqual(expect.arrayContaining([
+      "AGENT_PRIVATE_KEY",
+      "FACILITATOR_PRIVATE_KEY",
+      "AUTH_SECRET",
+      "AGENTPAY_MASTER_KEY",
+    ]));
     expect(postgres).toMatchObject({
       POSTGRES_USER: "agentpay",
       POSTGRES_PASSWORD: "test-only-postgres-password",

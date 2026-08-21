@@ -114,6 +114,8 @@ test("returns the validated payer together with the safe fingerprint", () => {
   expect(details).toEqual({
     fingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
     payer: PAYER,
+    nonce: NONCE,
+    validBefore: new Date(9_999_999_999_000),
   });
 });
 

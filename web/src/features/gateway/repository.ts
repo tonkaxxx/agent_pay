@@ -3,6 +3,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 
 import * as schema from "@/db/schema";
+import type { PayoutPolicy } from "@/features/finance/policy";
 
 import type { EncryptedSecret } from "./secrets";
 
@@ -30,6 +31,7 @@ export interface EndpointSummary {
   readonly authMode: EndpointAuthMode;
   readonly payTo: string;
   readonly amountAtomic: string;
+  readonly payoutPolicy: PayoutPolicy;
   readonly status: EndpointStatus;
   readonly configVersion: number;
   readonly secretConfigured: boolean;
@@ -58,6 +60,7 @@ const summaryColumns = {
   authMode: schema.merchantEndpoints.authMode,
   payTo: schema.merchantEndpoints.payTo,
   amountAtomic: schema.merchantEndpoints.amountAtomic,
+  payoutPolicy: schema.merchantEndpoints.payoutPolicy,
   status: schema.merchantEndpoints.status,
   configVersion: schema.merchantEndpoints.configVersion,
   secretConfigured: schema.merchantEndpoints.secretCiphertext,
@@ -95,6 +98,7 @@ function toSummary(row: Record<string, unknown>): EndpointSummary {
     authMode: row.authMode as EndpointAuthMode,
     payTo: row.payTo as string,
     amountAtomic: row.amountAtomic as string,
+    payoutPolicy: row.payoutPolicy as PayoutPolicy,
     status: row.status as EndpointStatus,
     configVersion: row.configVersion as number,
     secretConfigured: readSecretConfigured(row),
@@ -500,6 +504,33 @@ export async function updateEndpointPrice(
       actorUserId: ownerId,
       eventType: "price_changed",
       endpointId,
+    });
+    return toSummary(row);
+  });
+}
+
+export async function updateEndpointPayoutPolicy(
+  db: GatewayDatabase,
+  endpointId: string,
+  ownerId: string,
+  payoutPolicy: PayoutPolicy,
+): Promise<EndpointSummary | null> {
+  return db.transaction(async (tx) => {
+    const updated = await tx
+      .update(schema.merchantEndpoints)
+      .set({ payoutPolicy, updatedAt: new Date() })
+      .where(and(
+        eq(schema.merchantEndpoints.id, endpointId),
+        eq(schema.merchantEndpoints.ownerId, ownerId),
+      ))
+      .returning();
+    const row = updated[0];
+    if (row === undefined) return null;
+    await writeAudit(tx, {
+      actorUserId: ownerId,
+      eventType: "payout_policy_changed",
+      endpointId,
+      metadata: { payoutPolicy },
     });
     return toSummary(row);
   });

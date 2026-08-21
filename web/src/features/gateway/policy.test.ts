@@ -35,4 +35,14 @@ describe("buildGatewayPolicy", () => {
       buildGatewayPolicy(endpoint, "not-a-url"),
     ).toThrowError();
   });
+
+  it("keeps the buyer price but routes custodial settlement to the collection wallet", () => {
+    const policy = buildGatewayPolicy(endpoint, siteUrl, {
+      mode: "custodial",
+      collectionAddress: "0x1111111111111111111111111111111111111111",
+    });
+
+    expect(policy.payTo).toBe("0x1111111111111111111111111111111111111111");
+    expect(policy.amountAtomic).toBe("1000000");
+  });
 });

@@ -68,5 +68,9 @@ describe("loadGatewayConfig", () => {
     expect(() =>
       loadGatewayConfig({ ...base, AGENT_PRIVATE_KEY: "secret" }),
     ).toThrowError(/Invalid gateway configuration: AGENT_PRIVATE_KEY/);
+
+    expect(() =>
+      loadGatewayConfig({ ...base, AGENTPAY_PAYOUT_PRIVATE_KEY: "secret" }),
+    ).toThrowError(/Invalid gateway configuration: AGENTPAY_PAYOUT_PRIVATE_KEY/);
   });
 });

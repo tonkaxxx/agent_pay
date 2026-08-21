@@ -11,3 +11,5 @@ coverage/
 .vscode/
 __pycache__/
 *.py[cod]
+/web/scripts/payout-worker.mjs
+/web/scripts/finance-cli.mjs

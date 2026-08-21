@@ -29,6 +29,8 @@ COPY web ./web
 RUN pnpm --filter @agentpay/server --filter @agentpay/facilitator run build
 RUN pnpm --dir web build
 RUN pnpm --dir web build:migrate
+RUN pnpm --dir web build:worker
+RUN pnpm --dir web build:finance-cli
 RUN pnpm --filter @agentpay/facilitator --prod deploy --legacy /output/facilitator
 
 FROM node:22.22.1-alpine3.23@sha256:8094c002d08262dba12645a3b4a15cd6cd627d30bc782f53229a2ec13ee22a00 AS runner
@@ -42,6 +44,8 @@ WORKDIR /app
 COPY --from=builder --chown=node:node /app/web/.next/standalone ./
 COPY --from=builder --chown=node:node /app/web/.next/static ./web/.next/static
 COPY --from=builder --chown=node:node /app/web/scripts/migrate.mjs ./web/scripts/migrate.mjs
+COPY --from=builder --chown=node:node /app/web/scripts/payout-worker.mjs ./web/scripts/payout-worker.mjs
+COPY --from=builder --chown=node:node /app/web/scripts/finance-cli.mjs ./web/scripts/finance-cli.mjs
 COPY --from=builder --chown=node:node /app/web/src/db/migrations ./web/src/db/migrations
 COPY --from=builder --chown=node:node /output/facilitator ./facilitator
 

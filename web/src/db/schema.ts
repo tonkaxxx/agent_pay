@@ -108,6 +108,11 @@ export const merchantEndpoints = pgTable(
     secretKeyVersion: integer("secret_key_version"),
     payTo: text("pay_to").notNull(),
     amountAtomic: text("amount_atomic").notNull(),
+    payoutPolicy: text("payout_policy", {
+      enum: ["threshold", "threshold_or_weekly"],
+    })
+      .notNull()
+      .default("threshold_or_weekly"),
     status: text("status", {
       enum: ["draft", "active", "paused"],
     })
@@ -129,6 +134,114 @@ export const merchantEndpoints = pgTable(
   (table) => [
     index("merchant_endpoint_owner_idx").on(table.ownerId),
     index("merchant_endpoint_status_idx").on(table.status),
+  ],
+);
+
+export const financeState = pgTable("finance_state", {
+  id: integer("id").primaryKey().default(1),
+  paused: boolean("paused").notNull().default(false),
+  pauseReason: text("pause_reason"),
+  reservedSellerNetAtomic: text("reserved_seller_net_atomic").notNull().default("0"),
+  workerHeartbeatAt: timestamp("worker_heartbeat_at", { mode: "date" }),
+  reconciledAt: timestamp("reconciled_at", { mode: "date" }),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const feeSweeps = pgTable("fee_sweep", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  amountAtomic: text("amount_atomic").notNull(),
+  status: text("status", {
+    enum: ["prepared", "submitted", "confirmed", "failed"],
+  }).notNull().default("prepared"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  confirmedAt: timestamp("confirmed_at", { mode: "date" }),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const payoutBatches = pgTable(
+  "payout_batch",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sellerPayTo: text("seller_pay_to").notNull(),
+    sellerNetAtomic: text("seller_net_atomic").notNull(),
+    commissionAtomic: text("commission_atomic").notNull(),
+    status: text("status", {
+      enum: ["prepared", "submitted", "confirmed", "failed"],
+    }).notNull().default("prepared"),
+    feeSweepId: uuid("fee_sweep_id").references(() => feeSweeps.id, {
+      onDelete: "restrict",
+    }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    confirmedAt: timestamp("confirmed_at", { mode: "date" }),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("payout_batch_status_idx").on(table.status),
+    index("payout_batch_fee_sweep_idx").on(table.feeSweepId),
+  ],
+);
+
+export const settlementObligations = pgTable(
+  "settlement_obligation",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    endpointId: uuid("endpoint_id")
+      .notNull()
+      .references(() => merchantEndpoints.id, { onDelete: "restrict" }),
+    payoutBatchId: uuid("payout_batch_id").references(() => payoutBatches.id, {
+      onDelete: "restrict",
+    }),
+    requestId: text("request_id").notNull(),
+    fingerprint: text("fingerprint").notNull().unique(),
+    payerAddress: text("payer_address").notNull(),
+    authorizationNonce: text("authorization_nonce").notNull(),
+    authorizationValidBefore: timestamp("authorization_valid_before", { mode: "date" }).notNull(),
+    sellerPayTo: text("seller_pay_to").notNull(),
+    grossAtomic: text("gross_atomic").notNull(),
+    commissionAtomic: text("commission_atomic").notNull(),
+    sellerNetAtomic: text("seller_net_atomic").notNull(),
+    settlementStatus: text("settlement_status", {
+      enum: ["pending", "settled", "failed", "cancelled"],
+    }).notNull().default("pending"),
+    settlementTxHash: text("settlement_tx_hash"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    settledAt: timestamp("settled_at", { mode: "date" }),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("settlement_obligation_tx_hash_uq")
+      .on(table.settlementTxHash)
+      .where(isNotNull(table.settlementTxHash)),
+    index("settlement_obligation_endpoint_idx").on(table.endpointId),
+    index("settlement_obligation_status_idx").on(table.settlementStatus),
+    index("settlement_obligation_payout_batch_idx").on(table.payoutBatchId),
+  ],
+);
+
+export const outgoingTransferAttempts = pgTable(
+  "outgoing_transfer_attempt",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    businessKey: text("business_key").notNull(),
+    transferKind: text("transfer_kind", { enum: ["seller", "fee"] }).notNull(),
+    attemptNumber: integer("attempt_number").notNull(),
+    nonce: text("nonce").notNull(),
+    recipient: text("recipient").notNull(),
+    amountAtomic: text("amount_atomic").notNull(),
+    rawTransaction: text("raw_transaction").notNull(),
+    txHash: text("tx_hash").notNull().unique(),
+    status: text("status", {
+      enum: ["signed", "submitted", "confirmed", "reverted", "replaced"],
+    }).notNull().default("signed"),
+    errorCode: text("error_code"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    submittedAt: timestamp("submitted_at", { mode: "date" }),
+    confirmedAt: timestamp("confirmed_at", { mode: "date" }),
+  },
+  (table) => [
+    uniqueIndex("outgoing_transfer_business_attempt_uq")
+      .on(table.businessKey, table.attemptNumber),
+    index("outgoing_transfer_status_idx").on(table.status),
   ],
 );
 

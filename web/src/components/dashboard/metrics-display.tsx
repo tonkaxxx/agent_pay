@@ -46,6 +46,21 @@ export function MetricsDisplay({ metrics }: MetricsDisplayProps) {
       </section>
 
       <section className={styles.metricCard}>
+        <span className={styles.metricValue}>{usdc(metrics.sellerNetAtomic)} USDC</span>
+        <span className={styles.metricLabel}>Your net revenue (95%)</span>
+      </section>
+
+      <section className={styles.metricCard}>
+        <span className={styles.metricValue}>{usdc(metrics.pendingPayoutAtomic)} USDC</span>
+        <span className={styles.metricLabel}>Pending payout</span>
+      </section>
+
+      <section className={styles.metricCard}>
+        <span className={styles.metricValue}>{usdc(metrics.paidOutAtomic)} USDC</span>
+        <span className={styles.metricLabel}>Paid out</span>
+      </section>
+
+      <section className={styles.metricCard}>
         <span className={styles.metricValue}>{metrics.uniquePayers}</span>
         <span className={styles.metricLabel}>Unique payers</span>
       </section>
@@ -86,6 +101,17 @@ export function MetricsDisplay({ metrics }: MetricsDisplayProps) {
                   ? ` (HTTP ${failure.upstreamStatus})`
                   : ""}
               </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {metrics.payoutTransactions.length > 0 ? (
+        <section className={styles.metricSpan}>
+          <span className={styles.metricLabel}>Payout transactions</span>
+          <ul className={styles.recentFailures}>
+            {metrics.payoutTransactions.map((txHash) => (
+              <li key={txHash} className={styles.mono}>{txHash}</li>
             ))}
           </ul>
         </section>

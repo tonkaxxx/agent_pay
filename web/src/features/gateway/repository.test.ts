@@ -84,6 +84,7 @@ describe("createEndpoint", () => {
       status: "draft",
       authMode: "bearer",
       amountAtomic: "10000",
+      payoutPolicy: "threshold_or_weekly",
       secretConfigured: false,
       configVersion: 1,
     });

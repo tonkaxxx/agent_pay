@@ -38,6 +38,8 @@ export class InvalidAuthorizationError extends Error {
 export interface AuthorizationDetails {
   readonly fingerprint: string;
   readonly payer: Address;
+  readonly nonce: `0x${string}`;
+  readonly validBefore: Date;
 }
 
 function fail(): never {
@@ -88,6 +90,12 @@ export function authorizationDetails(
     if (authorization.value !== policy.amount) fail();
     const nonce = authorization.nonce;
     if (typeof nonce !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(nonce)) fail();
+    const validBefore = authorization.validBefore;
+    if (typeof validBefore !== "string" || !/^\d+$/.test(validBefore)) fail();
+    const validBeforeMilliseconds = Number(BigInt(validBefore) * 1000n);
+    if (!Number.isSafeInteger(validBeforeMilliseconds)) fail();
+    const validBeforeDate = new Date(validBeforeMilliseconds);
+    if (Number.isNaN(validBeforeDate.getTime())) fail();
 
     const material = [
       policy.network,
@@ -98,6 +106,8 @@ export function authorizationDetails(
     return {
       fingerprint: createHash("sha256").update(material).digest("hex"),
       payer,
+      nonce: nonce.toLowerCase() as `0x${string}`,
+      validBefore: validBeforeDate,
     };
   } catch (error) {
     if (error instanceof InvalidAuthorizationError) throw error;

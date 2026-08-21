@@ -33,8 +33,11 @@ Sellers sign in with GitHub or a passwordless email link, enter one fixed HTTPS
 GET upstream, choose Bearer or `X-API-Key`, set a USDC price and Base payout
 address, test connectivity, and publish `GET /g/<public-id>`. AgentPay handles
 x402 v2, replay protection, SSRF-safe proxying, encrypted credentials,
-settlement metrics, and a 5% commission ledger. The seller still receives 100%
-onchain; automatic commission collection is not part of this release.
+settlement metrics, and an optional custodial 5% commission mode. In that mode
+the buyer still uses standard x402 v2 `exact`, while AgentPay receives the
+buyer total, accrues 95% to the seller, pays sellers daily, and sweeps the 5%
+fee only after the seller payout confirms. The legacy direct-settlement mode
+remains the safe default.
 
 See [the hosted gateway runbook](docs/operations/hosted-get-gateway-runbook.md).
 
@@ -95,8 +98,11 @@ they construct a signer. They do not read an RPC URL.
 - `docs/superpowers/plans`: implementation and verification plan.
 
 Production runs `web`, `facilitator`, authenticated persistent Redis,
-PostgreSQL, and a one-shot migration job on one server and one Docker Compose
-project. Only `web` is attached to public ingress.
+PostgreSQL, a one-shot migration job, and (when the `custodial` profile is
+enabled) an internal payout worker on one server and one Docker Compose
+project. Only `web` is attached to public ingress. See the
+[custodial commission runbook](docs/operations/custodial-commission-runbook.md)
+before enabling custody.
 
 ## Local development
 

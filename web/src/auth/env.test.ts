@@ -201,6 +201,9 @@ describe("loadAuthEnvironment", () => {
     expect(() =>
       loadAuthEnvironment(baseEnv({ AGENT_PRIVATE_KEY: "0xdeadbeef" })),
     ).toThrow();
+    expect(() =>
+      loadAuthEnvironment(baseEnv({ AGENTPAY_PAYOUT_PRIVATE_KEY: "0xdeadbeef" })),
+    ).toThrow();
   });
 
   it("requires a valid auth URL and rejects URLs with embedded credentials", () => {

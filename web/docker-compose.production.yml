@@ -25,6 +25,9 @@ services:
       NODE_ENV: production
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?set the public HTTPS origin}
       AGENTPAY_PAY_TO: ${AGENTPAY_PAY_TO:?set the USDC recipient}
+      AGENTPAY_FEE_MODE: ${AGENTPAY_FEE_MODE:-ledger}
+      AGENTPAY_GATEWAY_COLLECTION_ADDRESS: ${AGENTPAY_GATEWAY_COLLECTION_ADDRESS:-}
+      AGENTPAY_CUSTODY_LEGAL_APPROVED: ${AGENTPAY_CUSTODY_LEGAL_APPROVED:-false}
       FACILITATOR_URL: http://facilitator:4022
       REDIS_URL: redis://:${REDIS_PASSWORD:?set a URL-safe Redis password}@redis:6379/0
       DATABASE_URL: postgres://${POSTGRES_USER:?set the PostgreSQL user}:${POSTGRES_PASSWORD:?set the PostgreSQL password}@postgres:5432/${POSTGRES_DB:?set the PostgreSQL database}
@@ -88,6 +91,34 @@ services:
       timeout: 5s
       retries: 6
       start_period: 15s
+
+  payout-worker:
+    <<: *app-hardening
+    profiles: [custodial]
+    image: ${AGENTPAY_IMAGE:?set an immutable AgentPay image tag}
+    user: "1000:1000"
+    command: ["node", "/app/web/scripts/payout-worker.mjs"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:?set the PostgreSQL user}:${POSTGRES_PASSWORD:?set the PostgreSQL password}@postgres:5432/${POSTGRES_DB:?set the PostgreSQL database}
+      BASE_MAINNET_RPC_URL: ${BASE_MAINNET_RPC_URL:?set a Base Mainnet RPC URL}
+      AGENTPAY_GATEWAY_COLLECTION_ADDRESS: ${AGENTPAY_GATEWAY_COLLECTION_ADDRESS:?set the dedicated collection wallet address}
+      AGENTPAY_PAYOUT_PRIVATE_KEY: ${AGENTPAY_PAYOUT_PRIVATE_KEY:?set the dedicated collection wallet private key}
+      AGENTPAY_FEE_RECIPIENT: ${AGENTPAY_FEE_RECIPIENT:?set the AgentPay treasury address}
+      AGENTPAY_CUSTODY_LEGAL_APPROVED: ${AGENTPAY_CUSTODY_LEGAL_APPROVED:?confirm legal approval before enabling custody}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      backend:
+      egress:
+        gw_priority: 1
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
 
   redis:
     <<: *app-hardening

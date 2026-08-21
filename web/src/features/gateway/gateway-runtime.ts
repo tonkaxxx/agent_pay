@@ -8,6 +8,12 @@ import { withX402 } from "@x402/next";
 import type { NextRequest } from "next/server";
 
 import { getDatabase } from "@/db";
+import { loadGatewayFinanceConfig } from "@/features/finance/config";
+import { createCustodialSettlementHooks } from "@/features/finance/hooks";
+import {
+  cancelObligation,
+  reserveObligation,
+} from "@/features/finance/ledger";
 import { loadMasterKeyConfig } from "@/features/gateway/env";
 import { decryptSecret } from "@/features/gateway/secrets";
 import { recordSettlement } from "@/features/gateway/events";
@@ -34,7 +40,27 @@ export function buildGatewayRuntime(
 ): GatewayRuntime {
   const db = getDatabase();
   const config = loadGatewayConfig(environment);
+  const finance = loadGatewayFinanceConfig(environment);
   const vault = loadMasterKeyConfig(environment);
+
+  const configureServer = finance.mode === "custodial"
+    ? (server: Awaited<ReturnType<typeof getSharedGatewayInfrastructure>>["server"]) => {
+        const hooks = createCustodialSettlementHooks({
+          collectionAddress: finance.collectionAddress,
+          requestId: randomUUID,
+          loadEndpoint: publicId =>
+            import("./repository").then(({ findActiveByPublicId }) =>
+              findActiveByPublicId(db.db, publicId),
+            ),
+          reserve: input => reserveObligation(db.db, input),
+          cancelled: fingerprint => cancelObligation(db.db, fingerprint),
+        });
+        server
+          .onAfterVerify(hooks.afterVerify)
+          .onAfterSettle(hooks.afterSettle)
+          .onVerifiedPaymentCanceled(hooks.paymentCanceled);
+      }
+    : undefined;
 
   const gatewayRoute = createGatewayRoute(
     {
@@ -46,12 +72,13 @@ export function buildGatewayRuntime(
         getSharedGatewayInfrastructure({
           facilitatorUrl: config.facilitatorUrl,
           redisUrl: config.redisUrl,
+          ...(configureServer === undefined ? {} : { configureServer }),
         }),
       loadEndpoint: publicId =>
         import("./repository").then(({ findActiveByPublicId }) =>
           findActiveByPublicId(db.db, publicId),
         ),
-      buildPolicy: buildGatewayPolicy,
+      buildPolicy: (endpoint, siteUrl) => buildGatewayPolicy(endpoint, siteUrl, finance),
       siteUrl: () => config.siteUrl,
       createPaidHandler: (endpoint, request, observe) => {
         const accept = request.headers.get("accept");

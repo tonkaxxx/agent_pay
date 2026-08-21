@@ -21,6 +21,7 @@ function summary(overrides: Partial<EndpointSummary> = {}): EndpointSummary {
     authMode: "bearer",
     payTo: "0x63A4536BC72c6d17A2ec1e6aa14555e0Ef9044D1",
     amountAtomic: "10000",
+    payoutPolicy: "threshold_or_weekly",
     status: "draft",
     configVersion: 1,
     secretConfigured: true,
@@ -102,6 +103,7 @@ describe("EndpointDetails", () => {
         statusAction={ok}
         credentialAction={ok}
         payoutAction={ok}
+        payoutPolicyAction={ok}
         priceAction={ok}
         connectivityAction={ok}
       />,
@@ -119,6 +121,7 @@ describe("EndpointDetails", () => {
         statusAction={ok}
         credentialAction={ok}
         payoutAction={ok}
+        payoutPolicyAction={ok}
         priceAction={ok}
         connectivityAction={ok}
       />,
@@ -139,6 +142,7 @@ describe("EndpointDetails", () => {
         statusAction={ok}
         credentialAction={ok}
         payoutAction={ok}
+        payoutPolicyAction={ok}
         priceAction={ok}
         connectivityAction={ok}
       />,
@@ -158,6 +162,7 @@ describe("EndpointDetails", () => {
         statusAction={ok}
         credentialAction={ok}
         payoutAction={ok}
+        payoutPolicyAction={ok}
         priceAction={ok}
         connectivityAction={ok}
       />,

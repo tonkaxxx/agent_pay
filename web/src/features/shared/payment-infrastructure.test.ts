@@ -42,6 +42,14 @@ describe("buildGatewayInfrastructure", () => {
     expect(deps.createRedisClient).toHaveBeenCalledWith(config.redisUrl);
     expect(deps.createStore).toHaveBeenCalledWith(redis);
   });
+
+  it("configures the gateway resource server before exposing it", async () => {
+    const deps = dependencies();
+    const configureServer = vi.fn();
+    await buildGatewayInfrastructure({ ...config, configureServer }, deps);
+
+    expect(configureServer).toHaveBeenCalledWith(server);
+  });
 });
 
 describe("getSharedGatewayInfrastructure", () => {

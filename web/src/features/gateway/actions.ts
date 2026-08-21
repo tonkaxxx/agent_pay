@@ -10,6 +10,7 @@ import { loadMasterKeyConfig } from "./env";
 import { newPublicId } from "./endpoint";
 import {
   changeEndpointPayout,
+  changeEndpointPayoutPolicy,
   changeEndpointPrice,
   createEndpointDraft,
   hasRecentSignIn,
@@ -208,6 +209,27 @@ export async function changePriceAction(
   }
   revalidatePath(`/dashboard/${endpointId}`);
   return {};
+}
+
+export async function changePayoutPolicyAction(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const auth = await currentAuth();
+  const endpointId = readString(formData, "endpointId");
+  try {
+    const recentAuth = await hasRecentSignIn(auth);
+    await changeEndpointPayoutPolicy(
+      auth,
+      endpointId,
+      readString(formData, "payoutPolicy"),
+      recentAuth,
+    );
+  } catch (error) {
+    return fieldError(error);
+  }
+  revalidatePath(`/dashboard/${endpointId}`);
+  return { success: "Payout schedule updated" };
 }
 
 export async function testConnectivityAction(

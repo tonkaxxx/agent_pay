@@ -3,6 +3,7 @@ type GatewayEnvironment = Readonly<Record<string, string | undefined>>;
 const FORBIDDEN_WEB_SECRETS: readonly string[] = [
   "AGENT_PRIVATE_KEY",
   "FACILITATOR_PRIVATE_KEY",
+  "AGENTPAY_PAYOUT_PRIVATE_KEY",
   ["CDP", "API", "KEY", "ID"].join("_"),
   ["CDP", "API", "KEY", "SECRET"].join("_"),
 ];

@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import * as schema from "@/db/schema";
 
@@ -9,6 +9,10 @@ export interface EndpointMetrics {
   readonly paidCount: number;
   readonly gmvAtomic: string;
   readonly commissionAtomic: string;
+  readonly sellerNetAtomic: string;
+  readonly pendingPayoutAtomic: string;
+  readonly paidOutAtomic: string;
+  readonly payoutTransactions: readonly string[];
   readonly uniquePayers: number;
   readonly repeatedPayers: number;
   readonly upstreamSuccessRate: number | null;
@@ -56,6 +60,46 @@ export async function metricsForEndpoint(
     .where(eq(schema.paymentEvents.endpointId, endpointId))
     .orderBy(desc(schema.paymentEvents.createdAt));
 
+  const obligations = await db
+    .select({
+      sellerNetAtomic: schema.settlementObligations.sellerNetAtomic,
+      status: schema.settlementObligations.settlementStatus,
+      payoutBatchId: schema.settlementObligations.payoutBatchId,
+      payoutStatus: schema.payoutBatches.status,
+    })
+    .from(schema.settlementObligations)
+    .leftJoin(
+      schema.payoutBatches,
+      eq(schema.settlementObligations.payoutBatchId, schema.payoutBatches.id),
+    )
+    .where(eq(schema.settlementObligations.endpointId, endpointId));
+
+  let sellerNetAtomic = 0n;
+  let pendingPayoutAtomic = 0n;
+  let paidOutAtomic = 0n;
+  const payoutBatchIds = new Set<string>();
+  for (const obligation of obligations) {
+    if (obligation.status !== "settled") continue;
+    const net = BigInt(obligation.sellerNetAtomic);
+    sellerNetAtomic += net;
+    if (obligation.payoutStatus === "confirmed") {
+      paidOutAtomic += net;
+    } else {
+      pendingPayoutAtomic += net;
+    }
+    if (obligation.payoutBatchId !== null) payoutBatchIds.add(obligation.payoutBatchId);
+  }
+  const businessKeys = [...payoutBatchIds].map((id) => `payout:${id}`);
+  const payoutAttempts = businessKeys.length === 0
+    ? []
+    : await db
+        .select({ txHash: schema.outgoingTransferAttempts.txHash })
+        .from(schema.outgoingTransferAttempts)
+        .where(and(
+          inArray(schema.outgoingTransferAttempts.businessKey, businessKeys),
+          eq(schema.outgoingTransferAttempts.status, "confirmed"),
+        ));
+
   const events = rows as unknown as EventRow[];
   const settled = events.filter((event) => event.outcome === "settled");
 
@@ -93,6 +137,10 @@ export async function metricsForEndpoint(
     paidCount: settled.length,
     gmvAtomic: gmvAtomic.toString(),
     commissionAtomic: commission.toString(),
+    sellerNetAtomic: sellerNetAtomic.toString(),
+    pendingPayoutAtomic: pendingPayoutAtomic.toString(),
+    paidOutAtomic: paidOutAtomic.toString(),
+    payoutTransactions: payoutAttempts.map((attempt) => attempt.txHash),
     uniquePayers: payers.size,
     repeatedPayers: [...payerCounts.values()].filter((count) => count > 1).length,
     upstreamSuccessRate: upstreamTotal === 0 ? null : upstreamSuccesses / upstreamTotal,
