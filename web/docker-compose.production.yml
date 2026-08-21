@@ -102,10 +102,10 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgres://${POSTGRES_USER:?set the PostgreSQL user}:${POSTGRES_PASSWORD:?set the PostgreSQL password}@postgres:5432/${POSTGRES_DB:?set the PostgreSQL database}
       BASE_MAINNET_RPC_URL: ${BASE_MAINNET_RPC_URL:?set a Base Mainnet RPC URL}
-      AGENTPAY_GATEWAY_COLLECTION_ADDRESS: ${AGENTPAY_GATEWAY_COLLECTION_ADDRESS:?set the dedicated collection wallet address}
-      AGENTPAY_PAYOUT_PRIVATE_KEY: ${AGENTPAY_PAYOUT_PRIVATE_KEY:?set the dedicated collection wallet private key}
-      AGENTPAY_FEE_RECIPIENT: ${AGENTPAY_FEE_RECIPIENT:?set the AgentPay treasury address}
-      AGENTPAY_CUSTODY_LEGAL_APPROVED: ${AGENTPAY_CUSTODY_LEGAL_APPROVED:?confirm legal approval before enabling custody}
+      AGENTPAY_GATEWAY_COLLECTION_ADDRESS: ${AGENTPAY_GATEWAY_COLLECTION_ADDRESS:-}
+      AGENTPAY_PAYOUT_PRIVATE_KEY: ${AGENTPAY_PAYOUT_PRIVATE_KEY:-}
+      AGENTPAY_FEE_RECIPIENT: ${AGENTPAY_FEE_RECIPIENT:-}
+      AGENTPAY_CUSTODY_LEGAL_APPROVED: ${AGENTPAY_CUSTODY_LEGAL_APPROVED:-false}
     depends_on:
       postgres:
         condition: service_healthy

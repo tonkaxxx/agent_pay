@@ -83,7 +83,48 @@ function renderCompose(): ComposeConfig {
   })) as ComposeConfig;
 }
 
+function renderLedgerCompose(): ComposeConfig {
+  return JSON.parse(execFileSync("docker", [
+    "compose",
+    "--file",
+    composeFile,
+    "config",
+    "--format",
+    "json",
+  ], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      AGENTPAY_IMAGE: immutableImage,
+      NEXT_PUBLIC_SITE_URL: "https://agentpay.thebestsites.ru/",
+      AGENTPAY_PAY_TO: "0x58B0fF9Fd53C854f3779acdE649a7FAc2de2d1CB",
+      AGENTPAY_FEE_MODE: "ledger",
+      BASE_MAINNET_RPC_URL: "https://base-rpc.invalid/",
+      FACILITATOR_PRIVATE_KEY: `0x${"12".repeat(32)}`,
+      REDIS_PASSWORD: "test-only-redis-password",
+      POSTGRES_USER: "agentpay",
+      POSTGRES_PASSWORD: "test-only-postgres-password",
+      POSTGRES_DB: "agentpay",
+      AUTH_SECRET: "test-only-auth-secret-with-at-least-32-characters",
+      AUTH_GITHUB_ID: "test-only-oauth-client-id",
+      AUTH_GITHUB_SECRET: "test-only-oauth-client-secret",
+      AUTH_EMAIL_SERVER: "smtp://test-only@localhost:587",
+      AUTH_EMAIL_FROM: "agentpay@example.invalid",
+      AGENTPAY_MASTER_KEY: Buffer.from("a".repeat(32)).toString("base64"),
+    },
+  })) as ComposeConfig;
+}
+
 describe("production Compose policy", () => {
+  test("renders ledger mode without inactive custodial secrets", () => {
+    const config = renderLedgerCompose();
+
+    expect(config.services.web.environment).toMatchObject({
+      AGENTPAY_FEE_MODE: "ledger",
+    });
+    expect(config.services).not.toHaveProperty("payout-worker");
+  });
+
   test("contains exactly the web, facilitator, Redis, PostgreSQL, and migrate services", () => {
     const config = renderCompose();
     expect(Object.keys(config.services).sort()).toEqual([
