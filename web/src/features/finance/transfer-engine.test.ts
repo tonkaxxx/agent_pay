@@ -156,14 +156,24 @@ describe("processTransfers", () => {
     });
   });
 
-  it("pauses finance when the hot wallet has less than 0.001 ETH for gas", async () => {
+  it("pauses finance when the hot wallet has less than 0.0001 ETH for gas", async () => {
     const fake = chain();
-    vi.mocked(fake.nativeBalance).mockResolvedValue(999_999_999_999_999n);
+    vi.mocked(fake.nativeBalance).mockResolvedValue(99_999_999_999_999n);
 
     await processTransfers(tdb.db, fake, NOW);
 
     const state = await tdb.db.select().from(schema.financeState);
     expect(state[0]).toMatchObject({ paused: true, pauseReason: "payout_gas_balance_low" });
+  });
+
+  it("keeps finance running with the funded production gas balance", async () => {
+    const fake = chain();
+    vi.mocked(fake.nativeBalance).mockResolvedValue(141_372_722_440_496n);
+
+    await processTransfers(tdb.db, fake, NOW);
+
+    const state = await tdb.db.select().from(schema.financeState);
+    expect(state[0]).toMatchObject({ paused: false, pauseReason: null });
   });
 
   it("serializes overlapping cycles so distinct payouts never share a wallet nonce", async () => {

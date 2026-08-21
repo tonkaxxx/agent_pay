@@ -11,7 +11,7 @@ import {
   setFinancePause,
 } from "./payouts";
 
-export const MINIMUM_PAYOUT_GAS_WEI = 1_000_000_000_000_000n;
+export const MINIMUM_PAYOUT_GAS_WEI = 100_000_000_000_000n;
 export const REPLACEMENT_DELAY_MS = 10 * 60 * 1000;
 export const MAX_TRANSFER_ATTEMPTS = 3;
 
