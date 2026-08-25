@@ -8,7 +8,6 @@ import {
   Globe2,
   LockKeyhole,
   ShieldCheck,
-  Waypoints,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -126,7 +125,6 @@ export function LandingPage() {
               <div className="section-kicker">The protocol</div>
               <h2 id="protocol-title">One request.<br />One payment.<br /><em>No friction.</em></h2>
             </div>
-            <div className="protocol-badge"><Waypoints aria-hidden="true" /> HTTP 402 → USDC → HTTP 200</div>
           </div>
           <div className="protocol-steps">
             {protocolSteps.map((step) => (

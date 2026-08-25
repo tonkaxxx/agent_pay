@@ -13,6 +13,7 @@ test("leads API sellers to onboarding while keeping proof and docs secondary", (
   expect(screen.getByText("x402 v2")).toBeInTheDocument();
   expect(screen.getByText("$0.01 / request")).toBeInTheDocument();
   expect(screen.getByText(/self-hosted settlement/i)).toBeInTheDocument();
+  expect(screen.queryByText("HTTP 402 → USDC → HTTP 200")).not.toBeInTheDocument();
 
   const actions = within(screen.getByRole("group", { name: /get started/i })).getAllByRole("link");
   expect(actions.map((link) => link.textContent?.trim())).toEqual([
