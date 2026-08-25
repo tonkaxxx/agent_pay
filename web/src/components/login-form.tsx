@@ -22,12 +22,7 @@ export function LoginForm({ github, email }: LoginFormOptions) {
         </div>
 
         <div className="login-brand-copy">
-          <p className="login-kicker">Seller access</p>
           <h1>Turn a GET endpoint into a <em>paid surface.</em></h1>
-          <p>
-            Sign in to configure your hosted gateway, set a price, and start accepting
-            programmatic USDC payments from agents.
-          </p>
         </div>
 
         <ol className="login-steps" aria-label="Seller onboarding steps">
@@ -48,7 +43,6 @@ export function LoginForm({ github, email }: LoginFormOptions) {
           </div>
 
           <div className="login-content">
-            <p className="login-kicker">AgentPay seller portal</p>
             <h2 id="login-title">Welcome back, seller.</h2>
             <p className="login-sub">Sign in to manage your paid endpoints and the gateway that powers them.</p>
 

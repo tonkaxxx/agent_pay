@@ -9,8 +9,10 @@ test("presents a seller-first passwordless sign-in layout", () => {
   render(<LoginForm github email />);
 
   expect(screen.getByRole("heading", { level: 1, name: /turn a get endpoint into a paid surface/i })).toBeInTheDocument();
-  expect(screen.getByText(/seller access/i)).toBeInTheDocument();
+  expect(screen.queryByText(/seller access/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/sign in to configure your hosted gateway/i)).not.toBeInTheDocument();
   expect(screen.getByRole("heading", { level: 2, name: /welcome back, seller/i })).toBeInTheDocument();
+  expect(screen.queryByText(/agentpay seller portal/i)).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: /back to home/i })).toHaveAttribute("href", "/");
   expect(screen.getByRole("list", { name: /seller onboarding steps/i })).toBeInTheDocument();
   expect(screen.getByText("Connect")).toBeInTheDocument();
