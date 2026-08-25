@@ -1,9 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { expect, test } from "vitest";
 
 import { LandingPage } from "./landing-page";
 
-test("presents AgentPay as working payment infrastructure for autonomous software", () => {
+test("leads API sellers to onboarding while keeping proof and docs secondary", () => {
   render(<LandingPage />);
 
   expect(screen.getByRole("heading", { level: 1, name: /apis can now charge themselves/i }))
@@ -12,9 +12,24 @@ test("presents AgentPay as working payment infrastructure for autonomous softwar
   expect(screen.getByText("USDC on Base")).toBeInTheDocument();
   expect(screen.getByText("x402 v2")).toBeInTheDocument();
   expect(screen.getByText("$0.01 / request")).toBeInTheDocument();
-  expect(screen.getByText(/policy, security and observability layer/i)).toBeInTheDocument();
   expect(screen.getByText(/self-hosted settlement/i)).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: /read the docs/i })).toHaveAttribute("href", "/docs");
+
+  const actions = within(screen.getByRole("group", { name: /get started/i })).getAllByRole("link");
+  expect(actions.map((link) => link.textContent?.trim())).toEqual([
+    "Start selling your API",
+    "Inspect the live API",
+    "Read the docs",
+  ]);
+  expect(actions[0]).toHaveAttribute("href", "/login");
+  expect(actions[0]).toHaveClass("hero-action--seller");
+  expect(actions[1]).toHaveAttribute("href", "#live-api");
+  expect(actions[1]).toHaveClass("hero-action--inspect");
+  expect(actions[2]).toHaveAttribute("href", "/docs");
+  expect(actions[2]).toHaveClass("hero-action--docs");
+
+  expect(screen.queryByText(/payment infrastructure for autonomous software/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /^thesis$/i })).not.toBeInTheDocument();
+  expect(screen.queryByText(/software is becoming an economic actor/i)).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: /talk to the founder/i })).toHaveAttribute(
     "href",
     "mailto:maltsev.yar@gmail.com?subject=AgentPay%20investment%20conversation",

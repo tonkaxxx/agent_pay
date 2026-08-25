@@ -8,13 +8,16 @@ const compactBody = {
   network: "eip155:8453",
 };
 
-test("presents the investor story and exposes the compact live quote", async ({ page }) => {
+test("leads sellers to onboarding and exposes the compact live quote", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page).toHaveTitle(/AgentPay — Payment infrastructure/);
+  await expect(page).toHaveTitle(/AgentPay — Sell APIs to autonomous agents/);
   await expect(page.getByRole("heading", { level: 1, name: /apis can now charge themselves/i })).toBeVisible();
   await expect(page.getByText("Working MVP")).toBeVisible();
-  await expect(page.getByText(/policy, security and observability layer/i)).toBeVisible();
+  await expect(page.getByRole("group", { name: /get started/i }).getByRole("link").first())
+    .toHaveText(/start selling your api/i);
+  await expect(page.getByText(/payment infrastructure for autonomous software/i)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /^thesis$/i })).toHaveCount(0);
 
   await page.getByRole("tab", { name: "GET /api/premium" }).click();
   await page.getByRole("button", { name: /call live endpoint/i }).click();

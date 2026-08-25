@@ -41,14 +41,14 @@ button { font: inherit; }
 .hero-orbit { position: absolute; z-index: -1; border: 1px solid rgba(226, 75, 49, .15); border-radius: 50%; pointer-events: none; }
 .hero-orbit--one { width: 430px; height: 430px; right: 4%; top: 106px; }
 .hero-orbit--two { width: 250px; height: 250px; right: 10%; top: 196px; }
-.eyebrow, .section-kicker { display: flex; align-items: center; gap: 10px; color: var(--accent); font-size: 10px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; }
-.eyebrow span, .section-kicker--light span { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 5px rgba(226,75,49,.1); }
+.section-kicker { display: flex; align-items: center; gap: 10px; color: var(--accent); font-size: 10px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; }
+.section-kicker--light span { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 5px rgba(226,75,49,.1); }
 .hero h1, h2 { font-family: var(--font-display), var(--font-display-fallback); font-weight: 400; }
-.hero h1 { max-width: 1040px; margin: 31px 0 0; font-size: clamp(68px, 9.8vw, 156px); line-height: .81; letter-spacing: -.065em; }
+.hero h1 { max-width: 1040px; margin: 0; font-size: clamp(68px, 9.8vw, 156px); line-height: .81; letter-spacing: -.065em; }
 .hero h1 em, h2 em { color: var(--accent); font-weight: 400; }
 .hero-bottom { display: grid; grid-template-columns: minmax(300px, 650px) auto; align-items: end; gap: 50px; margin-top: 62px; }
 .hero-bottom p { margin: 0; max-width: 620px; color: var(--muted); font-size: clamp(15px, 1.4vw, 19px); line-height: 1.65; }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; }
 .button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 49px; padding: 0 19px; border-radius: 999px; font-size: 12px; font-weight: 750; transition: transform .2s ease, background .2s ease, color .2s ease; }
 .button:hover { transform: translateY(-2px); }
 .button svg { width: 16px; }
@@ -56,6 +56,11 @@ button { font: inherit; }
 .button--primary:hover { background: var(--accent-dark); }
 .button--secondary { border: 1px solid #a89f91; background: rgba(242,238,228,.6); }
 .button--secondary:hover { background: var(--ink); color: var(--paper); }
+.hero-action--seller { min-height: 56px; padding: 0 24px; font-size: 13px; box-shadow: 0 10px 28px rgba(196,58,36,.2); }
+.hero-action--inspect { min-height: 49px; }
+.hero-action--docs { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 49px; padding: 0 9px; color: var(--muted); font-size: 11px; font-weight: 750; transition: color .2s ease, transform .2s ease; }
+.hero-action--docs:hover { color: var(--accent); transform: translateY(-2px); }
+.hero-action--docs svg { width: 14px; }
 
 .proof-strip { width: min(100% - 48px, 1440px); margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); }
 .proof-item { min-height: 112px; padding: 26px 28px; border-right: 1px solid var(--line); display: flex; flex-direction: column; justify-content: space-between; }
@@ -63,12 +68,7 @@ button { font: inherit; }
 .proof-item span { color: var(--muted); font-size: 9px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
 .proof-item strong { font-family: var(--font-display), var(--font-display-fallback); font-size: clamp(19px, 2vw, 28px); font-weight: 400; }
 
-.thesis-section { width: min(100% - 48px, 1440px); margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); }
-.section-intro, .thesis-copy { min-height: 560px; padding: clamp(70px, 9vw, 132px) clamp(20px, 5vw, 80px); }
-.section-intro { position: relative; border-right: 1px solid var(--line); }
-.section-intro h2, .protocol-heading h2, .live-api-copy h2, .pillars-heading h2, .founder-section h2 { margin: 28px 0 0; font-size: clamp(48px, 5.7vw, 86px); line-height: .96; letter-spacing: -.045em; }
-.thesis-symbol { position: absolute; left: clamp(20px, 5vw, 80px); bottom: 68px; width: 64px; height: 64px; border: 1px solid var(--line); border-radius: 50%; display: grid; place-items: center; color: var(--accent); }
-.thesis-symbol svg { width: 25px; }
+.protocol-heading h2, .live-api-copy h2, .pillars-heading h2, .founder-section h2 { margin: 28px 0 0; font-size: clamp(48px, 5.7vw, 86px); line-height: .96; letter-spacing: -.045em; }
 .thesis-copy { display: flex; flex-direction: column; justify-content: center; }
 .thesis-copy p { max-width: 570px; margin: 0 0 24px; color: var(--muted); font-size: 15px; line-height: 1.7; }
 .thesis-copy .lead-copy { color: var(--ink); font-family: var(--font-display), var(--font-display-fallback); font-size: clamp(25px, 2.6vw, 38px); line-height: 1.22; }
@@ -247,7 +247,7 @@ button { font: inherit; }
 }
 
 @media (max-width: 720px) {
-  .site-header, .hero, .proof-strip, .thesis-section, .protocol-section, .pillars-section, .founder-section { width: min(100% - 32px, 1440px); }
+  .site-header, .hero, .proof-strip, .protocol-section, .pillars-section, .founder-section { width: min(100% - 32px, 1440px); }
   .site-header { height: 74px; }
   .header-cta { padding: 10px 12px; font-size: 0; }
   .header-cta svg { width: 16px; }
@@ -255,15 +255,12 @@ button { font: inherit; }
   .hero h1 { font-size: clamp(59px, 19vw, 94px); line-height: .86; }
   .hero-bottom { margin-top: 46px; }
   .hero-actions { flex-direction: column; align-items: stretch; }
+  .hero-action--docs { width: 100%; }
   .hero-orbit { display: none; }
   .proof-strip { grid-template-columns: 1fr 1fr; }
   .proof-item { min-height: 96px; padding: 20px 16px; }
   .proof-item:nth-child(2) { border-right: 0; }
   .proof-item:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
-  .thesis-section { grid-template-columns: 1fr; }
-  .section-intro, .thesis-copy { min-height: auto; padding: 74px 8px; }
-  .section-intro { border-right: 0; border-bottom: 1px solid var(--line); }
-  .thesis-symbol { display: none; }
   .protocol-heading { display: block; }
   .protocol-badge { margin-top: 30px; }
   .protocol-step { grid-template-columns: 44px 1fr; padding: 24px 0; }

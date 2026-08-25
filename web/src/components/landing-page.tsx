@@ -7,9 +7,7 @@ import {
   Code2,
   Globe2,
   LockKeyhole,
-  Network,
   ShieldCheck,
-  Sparkles,
   Waypoints,
 } from "lucide-react";
 import Link from "next/link";
@@ -76,7 +74,6 @@ export function LandingPage() {
           AgentPay
         </Link>
         <nav className="desktop-nav" aria-label="Primary navigation">
-          <a href="#thesis">Thesis</a>
           <a href="#protocol">Protocol</a>
           <a href="#live-api">Live API</a>
           <Link href="/docs">Docs <ArrowUpRight aria-hidden="true" /></Link>
@@ -92,7 +89,6 @@ export function LandingPage() {
           <div className="hero-orbit hero-orbit--one" aria-hidden="true" />
           <div className="hero-orbit hero-orbit--two" aria-hidden="true" />
           <div className="hero-watermark" aria-hidden="true">402</div>
-          <div className="eyebrow"><span /> Payment infrastructure for autonomous software</div>
           <h1 id="hero-title" aria-label="APIs can now charge themselves.">
             APIs can now<br /><em>charge themselves.</em>
           </h1>
@@ -101,15 +97,15 @@ export function LandingPage() {
               AgentPay turns HTTP 402 into an autonomous USDC payment flow for AI agents.
               Discover a price, pay within policy, and continue — no accounts, invoices, or human checkout.
             </p>
-            <div className="hero-actions">
-              <a className="button button--primary" href="#live-api">
+            <div className="hero-actions" role="group" aria-label="Get started">
+              <Link className="button button--primary hero-action--seller" href="/login">
+                Start selling your API <ArrowUpRight aria-hidden="true" />
+              </Link>
+              <a className="button button--secondary hero-action--inspect" href="#live-api">
                 Inspect the live API <ArrowDownRight aria-hidden="true" />
               </a>
-              <Link className="button button--secondary" href="/docs">
+              <Link className="hero-action--docs" href="/docs">
                 Read the docs <ArrowUpRight aria-hidden="true" />
-              </Link>
-              <Link className="button button--primary" href="/login">
-                Start selling your API <ArrowUpRight aria-hidden="true" />
               </Link>
             </div>
           </div>
@@ -122,31 +118,6 @@ export function LandingPage() {
               <strong>{value}</strong>
             </div>
           ))}
-        </section>
-
-        <section className="thesis-section" id="thesis" aria-labelledby="thesis-title">
-          <div className="section-intro">
-            <div className="section-kicker">The thesis</div>
-            <h2 id="thesis-title">Software is becoming an <em>economic actor.</em></h2>
-            <div className="thesis-symbol" aria-hidden="true"><Sparkles /></div>
-          </div>
-          <div className="thesis-copy">
-            <p className="lead-copy">
-              Agents can browse, reason, and act — but they still hit a human checkout when value must move.
-            </p>
-            <p>
-              AgentPay gives APIs a machine-native price and agents a policy-controlled way to pay it.
-              One familiar HTTP status becomes a market primitive: ask, quote, settle, continue.
-            </p>
-            <p>
-              AgentPay is the policy, security and observability layer for agentic commerce —
-              the control plane between autonomous wallets and paid APIs.
-            </p>
-            <div className="thesis-note">
-              <Network aria-hidden="true" />
-              <span>Built for the point where API infrastructure becomes agent commerce.</span>
-            </div>
-          </div>
         </section>
 
         <section className="protocol-section" id="protocol" aria-labelledby="protocol-title">

@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "AgentPay",
     short_name: "AgentPay",
-    description: "HTTP 402 payment infrastructure for autonomous software.",
+    description: "Turn any GET API into a paid x402 endpoint on Base.",
     start_url: "/",
     display: "standalone",
     background_color: "#f2eee4",

@@ -7,7 +7,7 @@ import { publicSiteUrl } from "./site-url";
 export const metadata: Metadata = {
   metadataBase: publicSiteUrl(),
   title: {
-    default: "AgentPay — Payment infrastructure for autonomous software",
+    default: "AgentPay — Sell APIs to autonomous agents",
     template: "%s · AgentPay",
   },
   description: "AgentPay turns HTTP 402 into autonomous, policy-controlled USDC payments for AI agents.",
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "AgentPay — APIs can now charge themselves.",
-    description: "HTTP 402 payment infrastructure for autonomous software.",
+    description: "Turn any GET API into a paid x402 endpoint on Base.",
   },
 };
 
